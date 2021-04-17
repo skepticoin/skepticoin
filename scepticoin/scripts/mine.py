@@ -43,7 +43,7 @@ def check_for_fresh_chain(thread):
         waited = True
         try:
             thread.local_peer.show_stats()
-            print("Waiting for fresh chain; press ^C to stop waiting and just mine")
+            print("Waiting for fresh chain")
             sleep(10)
         except KeyboardInterrupt:
             break
