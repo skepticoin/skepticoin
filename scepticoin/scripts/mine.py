@@ -2,7 +2,6 @@ import urllib.request
 import logging
 import sys
 from decimal import Decimal
-import shutil
 import os
 import random
 
@@ -33,7 +32,7 @@ def save_wallet(wallet):
     with open("wallet.json.new", 'w') as f:
         wallet.dump(f)
 
-    shutil.move("wallet.json.new", "wallet.json")
+    os.replace("wallet.json.new", "wallet.json")
 
 
 def check_for_fresh_chain(thread):
