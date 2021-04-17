@@ -27,11 +27,13 @@ def initialize_peers_file():
 
 
 def save_wallet(wallet):
+    # This manual handling of files is sure to create wallet file corruption at one point or another... oh well,
+    # reliving the bitcoin experience one mistake at a time.
+
     with open("wallet.json.new", 'w') as f:
         wallet.dump(f)
-        # TODO To provide a more "living on the edge" experience we should get rid of this atomic operation to increase
-        # the number of ways wallets can get corrupted
-        shutil.move("wallet.json.new", "wallet.json")
+
+    shutil.move("wallet.json.new", "wallet.json")
 
 
 def check_for_fresh_chain(thread):
