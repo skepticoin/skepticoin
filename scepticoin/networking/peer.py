@@ -144,7 +144,7 @@ class NetworkManager(Manager):
     def broadcast_block(self, block):
         logger.info("%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash())))
         message = DataMessage(DATA_BLOCK, block)
-        for peer in self.connected_peers.values():
+        for peer in list(self.connected_peers.values()):
             try:
                 # try/except b/c .send_message might try to set the selector for a just-closed sock to writing
                 peer.send_message(message)
@@ -155,7 +155,7 @@ class NetworkManager(Manager):
 
     def broadcast_transaction(self, transaction):
         message = DataMessage(DATA_TRANSACTION, transaction)
-        for peer in self.connected_peers.values():
+        for peer in list(self.connected_peers.values()):
             try:
                 # try/except b/c .send_message might try to set the selector for a just-closed sock to writing
                 peer.send_message(message)
