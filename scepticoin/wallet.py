@@ -1,3 +1,4 @@
+import os
 import ecdsa
 import json
 
@@ -137,3 +138,13 @@ def create_spend_transaction(wallet, coinstate, value, miners_fee, output_public
                 return sign_transaction(wallet, unspent_transaction_outs, Transaction(inputs, outputs))
 
     raise Exception("Insufficient balance")
+
+
+def save_wallet(wallet):
+    # This manual handling of files is sure to create wallet file corruption at one point or another... oh well,
+    # reliving the bitcoin experience one mistake at a time.
+
+    with open("wallet.json.new", 'w') as f:
+        wallet.dump(f)
+
+    os.replace("wallet.json.new", "wallet.json")
