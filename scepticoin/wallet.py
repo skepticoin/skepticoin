@@ -8,6 +8,10 @@ from .datatypes import Input, Transaction, Output
 from .coinstate import PKBalance
 
 
+class AddressParseError(Exception):
+    pass
+
+
 class Wallet:
 
     def __init__(self, keypairs, unused_public_keys, public_key_annotations):
@@ -148,3 +152,27 @@ def save_wallet(wallet):
         wallet.dump(f)
 
     os.replace("wallet.json.new", "wallet.json")
+
+
+def is_valid_address(full_scepticoin_address):
+    try:
+        parse_address(full_scepticoin_address)
+        return True
+    except AddressParseError:
+        return False
+
+
+def parse_address(full_scepticoin_address):
+    if full_scepticoin_address[:3] != "SCE":
+        raise AddressParseError()
+
+    if full_scepticoin_address[-3:] != "PTI":
+        raise AddressParseError()
+
+    if len(full_scepticoin_address) != 3 + 128 + 3:
+        raise AddressParseError()
+
+    if not all(c in '0123456789abcdef' for c in full_scepticoin_address[3:-3]):
+        raise AddressParseError()
+
+    return computer(full_scepticoin_address[3:-3])
