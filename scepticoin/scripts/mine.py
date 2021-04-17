@@ -1,3 +1,4 @@
+from pathlib import Path
 import urllib.request
 import logging
 import sys
@@ -69,7 +70,7 @@ def main():
         if height % 1000 == 0:
             print(filename)
 
-        block = Block.stream_deserialize(open('chain/%s' % filename, 'rb'))
+        block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
         coinstate = coinstate.add_block_no_validation(block)
 
     try:
@@ -103,7 +104,7 @@ def main():
                 break
 
         coinstate = coinstate.add_block(block, int(time()))
-        with open('chain/%s' % block_filename(block), 'wb') as f:
+        with open(Path('chain') / block_filename(block), 'wb') as f:
             f.write(block.serialize())
         print("FOUND", block_filename(block))
         print("Your wallet now contains %s scepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
