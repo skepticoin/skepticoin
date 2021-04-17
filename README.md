@@ -1,6 +1,3 @@
-## Scepticoin
-The Coin for non-believers
-
 ## What is Scepticoin?
 
 Scepticoin is a peer-to-peer digital currency that enables you to send money
