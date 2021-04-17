@@ -1,0 +1,10 @@
+pyvenv.cfg
+bin
+lib
+lib64
+share
+.eggs
+*.egg-info/
+dist
+
+__pycache__
