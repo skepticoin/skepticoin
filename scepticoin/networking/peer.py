@@ -832,8 +832,8 @@ class LocalPeer:
 
         print("\nCHAIN")
         for (head, lca) in coinstate.forks():
-            if head.height < coinstate.head().height - 100:
-                continue  # don't show forks older than 100 blocks
+            if head.height < coinstate.head().height - 10:
+                continue  # don't show forks which are out-ran by more than 10 blocks
 
             print("Height    %s" % head.height)
             print("Date/time %s" % datetime.fromtimestamp(head.timestamp).isoformat())
