@@ -3,7 +3,11 @@ from setuptools import setup, find_packages
 setup(
     name="scepticoin",
     description="The Coin for Non-Believers",
+    long_description=open("README.md", 'r').read(),
+    long_description_content_type='text/markdown',
+
     author="Sashimi Houdini",
+    url="https://github.com/scepticoin/scepticoin/",
 
     install_requires=[
         "scrypt>=0.8.17",
@@ -29,6 +33,7 @@ setup(
         ],
     },
 
+    license="BSD-3-Clause",
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
@@ -36,7 +41,7 @@ setup(
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Developers',
 
-        # 'License :: OSI Approved :: Python Software Foundation License',
+        'License :: OSI Approved :: BSD License',
 
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: Microsoft :: Windows',
