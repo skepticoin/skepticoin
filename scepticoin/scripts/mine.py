@@ -28,6 +28,10 @@ def main():
         FORMAT = '%(asctime)s %(message)s'
         logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
 
+    if "--log-networking-to-stdout" in sys.argv:
+        FORMAT = '%(asctime)s %(message)s'
+        logging.basicConfig(format=FORMAT, stream=sys.stdout, level=logging.INFO)
+
     create_chain_dir()
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
