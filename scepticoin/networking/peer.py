@@ -639,8 +639,12 @@ class ConnectedRemotePeer(RemotePeer):
         # request the next one
         self.check_inventory_messages()
 
-        # TODO if not in ibd, and the block is recent: broadcast it. Only if: it's the new head.
-        # should we limit the echoing? hmmm... maybe send it to a certain max. number of random peers.
+        if block == coinstate.head() and header.in_response_to == 0:
+            # "header.in_response_to == 0" is being used as a bit of a proxy for "not in IBD" here, but it would be
+            # better to check for that state more explicitly. We don't want to broadcast blocks while in IBD, because in
+            # that state the fact that some block is our new head doesn't mean at all that we're talking about the real
+            # chain's new head, and only the latter is relevant to the rest of the world.
+            local_peer.network_manager.broadcast_block(block)
 
     def handle_transaction_received(self, header, message):
         transaction = message.data
