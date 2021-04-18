@@ -35,6 +35,13 @@ def check_for_fresh_chain(thread):
             sleep(10)
         except KeyboardInterrupt:
             break
+
+    while len(thread.local_peer.network_manager.get_active_peers()) == 0:
+        waited = True
+        thread.local_peer.show_stats()
+        print("Waiting for peers")
+        sleep(3)
+
     return waited
 
 

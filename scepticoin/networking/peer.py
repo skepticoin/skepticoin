@@ -826,8 +826,8 @@ class LocalPeer:
         coinstate = self.chain_manager.coinstate
 
         print("NETWORK")
-        print("Nr. of connected peers:", len(self.network_manager.connected_peers))
-        for p in list(self.network_manager.connected_peers.values())[:10]:
+        print("Nr. of connected peers:", len(self.network_manager.get_active_peers()))
+        for p in self.network_manager.get_active_peers()[:10]:
             print("%15s:%s - %s" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction))
 
         print("\nCHAIN")
