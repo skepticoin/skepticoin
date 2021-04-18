@@ -13,6 +13,7 @@ setup(
         "scrypt>=0.8.17",
         "ecdsa>=0.16.1",
         "immutables>=0.15",
+        "ptpython",
     ],
 
     packages=find_packages(),
@@ -31,6 +32,7 @@ setup(
             'scepticoin-mine=scepticoin.scripts.mine:main',
             'scepticoin-receive=scepticoin.scripts.receive:main',
             'scepticoin-send=scepticoin.scripts.send:main',
+            'scepticoin-repl=scepticoin.scripts.repl:main',
         ],
     },
 

@@ -189,15 +189,20 @@ class CoinState:
 
     @property
     def at_head(self):
-        translate = {
-            "unspent_transaction_outs": "unspent_transaction_outs_by_hash",
-            "block_by_height": "block_by_height_by_hash",
-            "public_key_balances": "public_key_balances_by_hash",
-        }
 
         class AtHead:
-            def __getattr__(inner_self, attr):
-                return getattr(self, translate[attr])[self.current_chain_hash]
+            @property
+            def unspent_transaction_outs(inner_self):
+                return self.unspent_transaction_outs_by_hash[self.current_chain_hash]
+
+            @property
+            def block_by_height(inner_self):
+                return self.block_by_height_by_hash[self.current_chain_hash]
+
+            @property
+            def public_key_balances(inner_self):
+                return self.public_key_balances_by_hash[self.current_chain_hash]
+
         return AtHead()
 
     def forks(self):

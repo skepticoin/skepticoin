@@ -314,3 +314,15 @@ class Block(Serializable):
 
     def get_total_work(self):
         return self.height  # TODO this is totally a placeholder :-D
+
+
+__all__ = [
+    'OutputReference',
+    'Input',
+    'Output',
+    'Transaction',
+    'PowEvidence',
+    'BlockSummary',
+    'BlockHeader',
+    'Block',
+]
