@@ -27,6 +27,7 @@ setup(
 
     entry_points={
         'console_scripts': [
+            'scepticoin-version=scepticoin.scripts.version:main',
             'scepticoin-mine=scepticoin.scripts.mine:main',
             'scepticoin-receive=scepticoin.scripts.receive:main',
             'scepticoin-send=scepticoin.scripts.send:main',

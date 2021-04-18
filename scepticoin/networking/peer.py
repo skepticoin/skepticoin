@@ -48,11 +48,7 @@ from .messages import (
 )
 from .utils import get_recent_block_heights
 from ..utils import block_filename
-
-try:
-    from ..scmversion import __version__
-except ImportError:
-    __version__ = "unknown"
+from ..__version__ import __version__
 
 
 logger = logging.getLogger("scepticoin.networking")
