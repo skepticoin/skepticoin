@@ -27,20 +27,20 @@ def create_chain_dir():
 def check_for_fresh_chain(thread):
     # wait until your chain is no more than 5 minutes old before you start mining yourself
     waited = False
-    while thread.local_peer.chain_manager.coinstate.head().timestamp + (5 * 60) < time():
-        waited = True
-        try:
+    try:
+        while thread.local_peer.chain_manager.coinstate.head().timestamp + (5 * 60) < time():
+            waited = True
             thread.local_peer.show_stats()
             print("Waiting for fresh chain")
             sleep(10)
-        except KeyboardInterrupt:
-            break
 
-    while len(thread.local_peer.network_manager.get_active_peers()) == 0:
-        waited = True
-        thread.local_peer.show_stats()
-        print("Waiting for peers")
-        sleep(3)
+        while len(thread.local_peer.network_manager.get_active_peers()) == 0:
+            waited = True
+            thread.local_peer.show_stats()
+            print("Waiting for peers")
+            sleep(3)
+    except KeyboardInterrupt:
+        print("WAITING ABORTED... CONTINUING DESPITE FRESHNESS/CONNECTEDNESS!")
 
     return waited
 
