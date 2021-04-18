@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 import logging
 import sys
@@ -22,11 +23,10 @@ from .utils import (
 
 
 def main():
-    if "--log-networking" in sys.argv:
-        log_filename = "/tmp/scepticoin-networking.log"
+    if "--log-networking-to-file" in sys.argv:
+        log_filename = Path(tempfile.gettempdir()) / "scepticoin-networking.log"
         FORMAT = '%(asctime)s %(message)s'
         logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
-        print("Logging on", log_filename)
 
     create_chain_dir()
     coinstate = read_chain_from_disk()
