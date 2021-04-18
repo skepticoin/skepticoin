@@ -39,32 +39,39 @@ def main():
     thread = start_networking_peer_in_background(coinstate)
     thread.local_peer.show_stats()
 
-    print("Starting main loop")
-    while True:
-        if check_for_fresh_chain(thread):
-            thread.local_peer.show_stats()
-            print("Starting mining")
-
-        public_key = wallet.get_annotated_public_key("reserved for potentially mined block")
-        save_wallet(wallet)
-
-        nonce = random.randrange(1 << 32)
+    try:
+        print("Starting main loop")
         while True:
-            coinstate, transactions = thread.local_peer.chain_manager.get_state()
-            increasing_time = max(int(time()), coinstate.head().timestamp + 1)
-            block = construct_block_for_mining(
-                coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
-            nonce = (nonce + 1) % (1 << 32)
-            if block.hash() < block.target:
-                break
+            if check_for_fresh_chain(thread):
+                thread.local_peer.show_stats()
+                print("Starting mining")
 
-        coinstate = coinstate.add_block(block, int(time()))
-        with open(Path('chain') / block_filename(block), 'wb') as f:
-            f.write(block.serialize())
-        print("FOUND", block_filename(block))
-        print("Your wallet now contains %s scepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
+            public_key = wallet.get_annotated_public_key("reserved for potentially mined block")
+            save_wallet(wallet)
 
-        thread.local_peer.chain_manager.set_coinstate(coinstate)
-        thread.local_peer.network_manager.broadcast_block(block)
+            nonce = random.randrange(1 << 32)
+            while True:
+                coinstate, transactions = thread.local_peer.chain_manager.get_state()
+                increasing_time = max(int(time()), coinstate.head().timestamp + 1)
+                block = construct_block_for_mining(
+                    coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
+                nonce = (nonce + 1) % (1 << 32)
+                if block.hash() < block.target:
+                    break
 
-    thread.stop()
+            coinstate = coinstate.add_block(block, int(time()))
+            with open(Path('chain') / block_filename(block), 'wb') as f:
+                f.write(block.serialize())
+            print("FOUND", block_filename(block))
+            print("Wallet balance: %s scepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
+
+            thread.local_peer.chain_manager.set_coinstate(coinstate)
+            thread.local_peer.network_manager.broadcast_block(block)
+
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt")
+    finally:
+        print("Stopping networking thread")
+        thread.stop()
+        print("Waiting for networking thread to stop")
+        thread.join()
