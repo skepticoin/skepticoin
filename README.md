@@ -28,7 +28,7 @@ The quickstart assumes (for now) that you have Python up and running.
 # Installing:
 $ python3 -m venv .
 $ . bin/activate
-$ pip install scepticoin
+$ pip install --upgrade scepticoin
 [..]
 Successfully installed scepticoin-0.1.2 ecdsa-0.16.1 immutables-0.15 scepticoin scrypt-0.8.18 six-1.15.0
 
