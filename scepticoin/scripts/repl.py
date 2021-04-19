@@ -64,6 +64,7 @@ def main():
             locals=locals,
             configure=configure,
             history_filename=history_file,
+            patch_stdout=True,
         )
 
     finally:
