@@ -13,3 +13,6 @@ def human(b):
 
 def computer(s):
     return unhexlify(s.encode('utf-8'))
+
+
+__all__ = ["human", "computer"]

@@ -365,3 +365,19 @@ class PeersMessage(Message):
         f.write(MSG_PEERS)
         f.write(struct.pack(b"B", self.version))
         stream_serialize_list(f, self.peers)
+
+
+__all__ = [
+    "MessageHeader",
+    "Message",
+    "SupportedVersion",
+    "HelloMessage",
+    "GetBlocksMessage",
+    "InventoryItem",
+    "InventoryMessage",
+    "GetDataMessage",
+    "DataMessage",
+    "GetPeersMessage",
+    "Peer",
+    "PeersMessage",
+]

@@ -5,7 +5,12 @@ from ptpython.repl import embed, run_config
 from ptpython.entry_points.run_ptpython import get_config_and_history_file
 
 from scepticoin.__version__ import __version__
+
 import scepticoin.datatypes
+import scepticoin.networking.messages
+import scepticoin.signing
+import scepticoin.humans
+from scepticoin.params import SASHIMI_PER_COIN
 
 from .utils import (
     initialize_peers_file,
@@ -43,10 +48,12 @@ def main():
             'show_stats': thread.local_peer.show_stats,
             'wallet': wallet,
             'get_coinstate': lambda: thread.local_peer.chain_manager.coinstate,
+            'SASHIMI_PER_COIN': SASHIMI_PER_COIN,
         }
 
-        for attr in scepticoin.datatypes.__all__:
-            locals[attr] = getattr(scepticoin.datatypes, attr)
+        for module in [scepticoin.datatypes, scepticoin.networking.messages, scepticoin.signing, scepticoin.humans]:
+            for attr in module.__all__:
+                locals[attr] = getattr(module, attr)
 
         def configure(repl) -> None:
             if os.path.exists(config_file):
