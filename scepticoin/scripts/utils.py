@@ -60,13 +60,14 @@ def read_chain_from_disk():
 
 
 def open_or_init_wallet():
-    try:
+    if os.path.isfile("wallet.json"):
         wallet = Wallet.load(open("wallet.json", "r"))
-    except Exception:  # bwegh
+    else:
         wallet = Wallet.empty()
         wallet.generate_keys(10_000)
         save_wallet(wallet)
         print("Created new wallet w/ 10.000 keys")
+
     return wallet
 
 
