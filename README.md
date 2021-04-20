@@ -16,6 +16,11 @@ more other people they convince, the richer they themselves become. Crypto-scept
 are a silent majority: they have no such incentive, so you never hear them.
 Scepticoin changes that, by making the sceptics invested in a coin themselves.
 
+## Goals & motto
+
+* 1 SC equals 1 BTC
+* Not "to the moon", but "into the ground"
+
 ## Getting started
 
 Follow the instructions below, and experience the thrill of being an early
@@ -84,3 +89,23 @@ Scepticoin is a "early phase" coin. This means you can probably mine some yourse
 
 If you have ethical objections against this, you can always go to the
 [faucet](https://github.com/scepticoin/scepticoin/issues/1) to get some free coin.
+
+## Frequently Asked Questions
+
+**Q:** Is this is real coin?
+
+**A:** Scepticoin is every bit as real as Bitcoin and its many clones.
+
+##
+
+**Q:** Is this some kind of joke?
+
+**A:** You can laugh all you want, but we all know you're just trying to hide your fear of missing out.
+
+##
+
+**Q:** Isn't this basically Dogecoin?
+
+**A:** No. Dogecoin started as a fun and friendly internet coin, but it didn't take long before it got completely overrun
+       by money-hungrey speculators of the worst kind. Scepticoin was founded on a firm disbelief in cryptocurrency. Whether
+       it will be completely overrun by speculators remains to be seen.
