@@ -17,17 +17,17 @@ MAX_BLOCK_SIZE = 1_000_000 // FIVE
 MAX_COINBASE_RANDOM_DATA_SIZE = 200
 
 # The total amount of money can be deduced from the halving algorithm but is put here as a constant; for bitcoin it is
-# often said to be "21 million" but is actually 209_999_999_769_000 satoshi. Because of rounding differences there will
-# be slightly fewer sashimi.  The only logical conclusion is that scepticoin is slightly more valuable (deflation!)
+# often said to be "21 million" but is actually 2_099_999_997_690_000 satoshi. Because of rounding differences there
+# will be slightly fewer sashimi. The only logical conclusion is that scepticoin is slightly more valuable (deflation!)
 # Note that this fits in 48 bits (and therefore easily in 8 bytes).
-MAX_SASHIMI = 209_999_998_635_000
+MAX_SASHIMI = 2_099_999_986_350_000
 
 # this is the awesome script to determine this value:
 """
 >>> total_coin = 0
 ... subsidy = 10 * 100_000_000
 ... while subsidy > 0:
-...     total_coin += 5 * 21_000 * subsidy
+...     total_coin += 5 * 210_000 * subsidy
 ...     subsidy = subsidy // 2
 ...     print(total_coin, subsidy)
 """
