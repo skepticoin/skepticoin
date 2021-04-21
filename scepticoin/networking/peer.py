@@ -119,7 +119,8 @@ class NetworkManager(Manager):
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
 
         self._sanity_check()
-        self.disconnected_peers[key] = remote_peer
+        if remote_peer.direction == OUTGOING:
+            self.disconnected_peers[key] = remote_peer
         del self.connected_peers[key]
         self._sanity_check()
 
@@ -127,6 +128,9 @@ class NetworkManager(Manager):
         return [p for p in self.connected_peers.values() if p.hello_sent and p.hello_received]
 
     def update_peer_db(self, remote_peer):
+        if remote_peer.direction != OUTGOING:
+            return
+
         # TSTTCPW... really quite barebones like this :-D
         db = [tuple(li) for li in json.loads(open("peers.json").read())]
 
@@ -723,7 +727,8 @@ class LocalPeer:
         events = selectors.EVENT_READ
 
         remote_host = conn.getpeername()[0]
-        remote_peer = ConnectedRemotePeer(remote_host, IRRELEVANT, INCOMING, None, conn)
+        remote_port = conn.getpeername()[1]
+        remote_peer = ConnectedRemotePeer(remote_host, remote_port, INCOMING, None, conn)
         self.selector.register(conn, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
 
