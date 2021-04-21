@@ -39,13 +39,15 @@ def main():
     thread = start_networking_peer_in_background(coinstate)
     thread.local_peer.show_stats()
 
+    if check_for_fresh_chain(thread):
+        thread.local_peer.show_stats()
+
+    print("Starting mining")
+
     try:
         print("Starting main loop")
-        while True:
-            if check_for_fresh_chain(thread):
-                thread.local_peer.show_stats()
-                print("Starting mining")
 
+        while True:
             public_key = wallet.get_annotated_public_key("reserved for potentially mined block")
             save_wallet(wallet)
 

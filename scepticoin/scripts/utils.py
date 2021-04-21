@@ -7,6 +7,8 @@ from scepticoin.coinstate import CoinState
 from scepticoin.networking.threading import NetworkingThread
 from scepticoin.wallet import Wallet, save_wallet
 from scepticoin.networking.utils import load_peers
+from scepticoin.params import DESIRED_BLOCK_TIMESPAN
+
 from time import time, sleep
 
 
@@ -25,10 +27,10 @@ def create_chain_dir():
 
 
 def check_for_fresh_chain(thread):
-    # wait until your chain is no more than 5 minutes old before you start mining yourself
+    # wait until your chain is no more than 20 typical block-sizes old before you start mining yourself
     waited = False
     try:
-        while thread.local_peer.chain_manager.coinstate.head().timestamp + (5 * 60) < time():
+        while thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN) < time():
             waited = True
             thread.local_peer.show_stats()
             print("Waiting for fresh chain")
@@ -39,6 +41,7 @@ def check_for_fresh_chain(thread):
             thread.local_peer.show_stats()
             print("Waiting for peers")
             sleep(3)
+
     except KeyboardInterrupt:
         print("WAITING ABORTED... CONTINUING DESPITE FRESHNESS/CONNECTEDNESS!")
 
