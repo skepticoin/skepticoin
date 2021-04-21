@@ -600,7 +600,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.send_message(data_message, prev_header=header)
 
     def handle_data_message_received(self, header, message):
-        logger.info("%15s ConnectedRemotePeer.handle_data_received(%s %s)" % (
+        logger.info("%15s ConnectedRemotePeer.handle_data_message_received(%s %s)" % (
             self.host, message.data_type, header.format()))
 
         if message.data_type == DATA_BLOCK:
