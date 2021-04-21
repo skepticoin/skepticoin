@@ -488,6 +488,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.receiver.receive(data)
 
     def handle_hello_message_received(self, header, message):
+        logger.info("%15s ConnectedRemotePeer.handle_hello_message_received(%s)" % (self.host, message.user_agent))
         self.hello_received = True
 
         if self.direction == INCOMING:
