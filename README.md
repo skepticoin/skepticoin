@@ -109,3 +109,9 @@ If you have ethical objections against this, you can always go to the
 **A:** No. Dogecoin started as a fun and friendly internet coin, but it didn't take long before it got completely overrun
        by money-hungrey speculators of the worst kind. Scepticoin was founded on a firm disbelief in cryptocurrency. Whether
        it will be completely overrun by speculators remains to be seen.
+
+##
+
+**Q:** Is it safe to put my life savings into scepticoin?
+
+**A:** [No](docs/security.md)
