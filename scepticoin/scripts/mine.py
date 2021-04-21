@@ -24,7 +24,7 @@ from .utils import (
 
 def main():
     if "--log-networking-to-file" in sys.argv:
-        log_filename = Path(tempfile.gettempdir()) / "scepticoin-networking.log"
+        log_filename = Path(tempfile.gettempdir()) / ("scepticoin-networking-%s.log" % int(time()))
         FORMAT = '%(asctime)s %(message)s'
         logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
 
