@@ -1,6 +1,9 @@
+import sys
 import urllib.request
 from pathlib import Path
 import os
+import tempfile
+import logging
 
 from scepticoin.datatypes import Block
 from scepticoin.coinstate import CoinState
@@ -80,3 +83,22 @@ def start_networking_peer_in_background(coinstate):
     thread.local_peer.network_manager.disconnected_peers = load_peers()
     thread.start()
     return thread
+
+
+def configure_logging_for_file():
+    log_filename = Path(tempfile.gettempdir()) / ("scepticoin-networking-%s.log" % int(time()))
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
+
+
+def configure_logging_for_stdout():
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT, stream=sys.stdout, level=logging.INFO)
+
+
+def configure_logging_by_argv():
+    if "--log-networking-to-file" in sys.argv:
+        configure_logging_for_file()
+
+    if "--log-networking-to-stdout" in sys.argv:
+        configure_logging_for_stdout()

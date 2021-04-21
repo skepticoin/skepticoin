@@ -1,7 +1,4 @@
-import tempfile
 from pathlib import Path
-import logging
-import sys
 from decimal import Decimal
 import random
 
@@ -19,18 +16,12 @@ from .utils import (
     open_or_init_wallet,
     start_networking_peer_in_background,
     check_for_fresh_chain,
+    configure_logging_by_argv,
 )
 
 
 def main():
-    if "--log-networking-to-file" in sys.argv:
-        log_filename = Path(tempfile.gettempdir()) / ("scepticoin-networking-%s.log" % int(time()))
-        FORMAT = '%(asctime)s %(message)s'
-        logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
-
-    if "--log-networking-to-stdout" in sys.argv:
-        FORMAT = '%(asctime)s %(message)s'
-        logging.basicConfig(format=FORMAT, stream=sys.stdout, level=logging.INFO)
+    configure_logging_by_argv()
 
     create_chain_dir()
     coinstate = read_chain_from_disk()
