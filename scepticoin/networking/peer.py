@@ -459,7 +459,7 @@ class ConnectedRemotePeer(RemotePeer):
                     nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING, None)
                 nm._sanity_check()
 
-            if message.nonce == local_peer.nonce:
+            if self.direction == OUTGOING and message.nonce == local_peer.nonce:
                 local_peer.network_manager.my_addresses.add((self.host, self.port))
                 local_peer.disconnect(self, "connection to self")
 
