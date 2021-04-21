@@ -445,27 +445,7 @@ class ConnectedRemotePeer(RemotePeer):
             self.host, type(message).__name__, header.format()))
 
         if isinstance(message, HelloMessage):
-            self.hello_received = True
-
-            if self.direction == INCOMING:
-                # also add the peer to the list of disconnected_peers in reverse direction
-                # TODO at some point: this means that if possible, each peer will be connected to twice. We should drop
-                # connection if that happens. Probably like so: it's the prober that receives "hello" and then closes
-                # because satisifed.
-                key = (self.host, message.my_port, OUTGOING)
-                nm = local_peer.network_manager
-                nm._sanity_check()
-                if key not in nm.disconnected_peers and key not in nm.connected_peers:
-                    nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING, None)
-                nm._sanity_check()
-
-            if self.direction == OUTGOING and message.nonce == local_peer.nonce:
-                local_peer.network_manager.my_addresses.add((self.host, self.port))
-                local_peer.disconnect(self, "connection to self")
-
-            local_peer.network_manager.update_peer_db(self)
-
-            return
+            return self.handle_hello_message_received(header, message)
 
         if not self.hello_received:
             raise Exception("First message must be Hello")
@@ -506,6 +486,27 @@ class ConnectedRemotePeer(RemotePeer):
         self.received += data
 
         self.receiver.receive(data)
+
+    def handle_hello_message_received(self, header, message):
+        self.hello_received = True
+
+        if self.direction == INCOMING:
+            # also add the peer to the list of disconnected_peers in reverse direction
+            # TODO at some point: this means that if possible, each peer will be connected to twice. We should drop
+            # connection if that happens. Probably like so: it's the prober that receives "hello" and then closes
+            # because satisifed.
+            key = (self.host, message.my_port, OUTGOING)
+            nm = local_peer.network_manager
+            nm._sanity_check()
+            if key not in nm.disconnected_peers and key not in nm.connected_peers:
+                nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING, None)
+            nm._sanity_check()
+
+        if self.direction == OUTGOING and message.nonce == local_peer.nonce:
+            local_peer.network_manager.my_addresses.add((self.host, self.port))
+            local_peer.disconnect(self, "connection to self")
+
+        local_peer.network_manager.update_peer_db(self)
 
     def handle_get_blocks_message_received(self, header, message):
         coinstate = local_peer.chain_manager.coinstate
