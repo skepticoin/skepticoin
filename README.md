@@ -115,3 +115,18 @@ If you have ethical objections against this, you can always go to the
 **Q:** Is it safe to put my life savings into scepticoin?
 
 **A:** [No](docs/security.md)
+
+## Commonly raised objections
+
+**O:** I can't buy scepticoin at an exchange -- this means it's not a "real" coin!
+
+**A:** You have that exactly backwards: Scepticoin is a peer-to-peer digital currency, which means it's independent from
+       established financial institutions such as exchanges. This independence is precisely its strength! You aren't
+       trying to suggest that cryptocurrency's main claim to fame is untrue, are you?
+
+##
+
+**O**: If you're so against cryptocurrency, starting a coin of your own is hypocritical.
+
+**A**: The ability to hold 2 directly opposing thoughts in your head is the core of cryptocurrency. If you can't do that
+       then this indeed isn't for you.
