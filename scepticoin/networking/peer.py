@@ -510,12 +510,16 @@ class ConnectedRemotePeer(RemotePeer):
         local_peer.network_manager.update_peer_db(self)
 
     def handle_get_blocks_message_received(self, header, message):
+        logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
         coinstate = local_peer.chain_manager.coinstate
+        logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
         for potential_start_hash in message.potential_start_hashes:
+            logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
             if potential_start_hash in coinstate.block_by_hash:
                 start_height = coinstate.block_by_hash[potential_start_hash].height + 1  # + 1: sent hash is last known
                 if start_height not in coinstate.by_height_at_head():
                     # we have no new info
+                    logger.debug("%15s ... no new info" % self.host)
                     self.send_message(InventoryMessage([]), prev_header=header)
                     return
 
@@ -530,6 +534,7 @@ class ConnectedRemotePeer(RemotePeer):
             InventoryItem(DATA_BLOCK, coinstate.by_height_at_head()[height].hash())
             for height in range(start_height, min(start_height + GET_BLOCKS_INVENTORY_SIZE, max_height))
         ]
+        logger.debug("%15s ... returning from %s, %s items" % (self.host, start_height, len(items)))
         self.send_message(InventoryMessage(items), prev_header=header)
 
     def handle_inventory_message_received(self, header, message):
@@ -596,9 +601,14 @@ class ConnectedRemotePeer(RemotePeer):
         coinstate = local_peer.chain_manager.coinstate
         if get_data_message.hash not in coinstate.block_by_hash:
             # we simply silently ignore GetDataMessage for hashes we don't have... future work: inc banscore, or ...
+            logger.debug("%15s ConnectedRemotePeer.handle_data_message_received for unknown hash %s" % (
+                self.host, human(get_data_message.hash)))
             return
 
         data_message = DataMessage(DATA_BLOCK, coinstate.block_by_hash[get_data_message.hash])
+
+        logger.debug("%15s ConnectedRemotePeer.handle_data_message_received for hash %s h. %s" % (
+            self.host, human(get_data_message.hash), coinstate.block_by_hash[get_data_message.hash].height))
         self.send_message(data_message, prev_header=header)
 
     def handle_data_message_received(self, header, message):
@@ -623,6 +633,11 @@ class ConnectedRemotePeer(RemotePeer):
             # implicit here: when you receive a datamessage, this could be because you requested it; and thus you'll
             # want to request the next one (the below check does nothing if there's nothing to do)
             self.check_inventory_messages()
+
+            logger.debug("%15s ConnectedRemotePeer.handle_block_received() for known block %s" % (
+                self.host, human(block.hash())))
+
+            # Known block, just return
             return
 
         try:
