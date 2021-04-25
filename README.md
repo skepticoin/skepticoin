@@ -130,3 +130,7 @@ If you have ethical objections against this, you can always go to the
 
 **A**: The ability to hold 2 directly opposing thoughts in your head is the core of cryptocurrency. If you can't do that
        then this indeed isn't for you.
+
+## Getting involved
+
+The best place to find other Skeptics is currently on the [Skepticoin Subreddit](https://www.reddit.com/r/skepticoin/).
