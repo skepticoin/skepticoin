@@ -1,9 +1,9 @@
 import immutables
 
-from scepticoin.signing import CoinbaseData, SECP256k1PublicKey, SECP256k1Signature
-from scepticoin.datatypes import Transaction, OutputReference, Input, Output
-from scepticoin.coinstate import uto_apply_transaction, pkb_apply_transaction, PKBalance
-from scepticoin.consensus import construct_reference_to_thin_air
+from skepticoin.signing import CoinbaseData, SECP256k1PublicKey, SECP256k1Signature
+from skepticoin.datatypes import Transaction, OutputReference, Input, Output
+from skepticoin.coinstate import uto_apply_transaction, pkb_apply_transaction, PKBalance
+from skepticoin.consensus import construct_reference_to_thin_air
 
 
 def test_uto_apply_transaction_on_coinbase():

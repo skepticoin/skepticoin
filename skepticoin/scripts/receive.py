@@ -14,4 +14,4 @@ def main():
     public_key = wallet.get_annotated_public_key(args.annotation)
     save_wallet(wallet)
 
-    print("SCE" + human(public_key) + "PTI")
+    print("SKE" + human(public_key) + "PTI")

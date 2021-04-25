@@ -1,5 +1,5 @@
 from io import BytesIO
-from scepticoin.serialization import stream_deserialize_vlq, stream_serialize_vlq
+from skepticoin.serialization import stream_deserialize_vlq, stream_serialize_vlq
 
 
 def test_vlq():

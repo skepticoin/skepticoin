@@ -1,7 +1,7 @@
 """
 Proof of Waiste... I mean Work
 
-In general simplicity is one of the main goals in the Scepticoin codebase. The less smoke and mirrors, the more closely
+In general simplicity is one of the main goals in the Skepticoin codebase. The less smoke and mirrors, the more closely
 we can observe the trick. Here we deviate from that approach somewhat, for the following reasons:
 
 * We don't want 0.0000001% of the bitcoin/litecoin mining power to be enough to do a successful 51% attack on our coin.
@@ -11,7 +11,7 @@ we can observe the trick. Here we deviate from that approach somewhat, for the f
   last.
 """
 
-from scepticoin.hash import sha256d
+from skepticoin.hash import sha256d
 
 
 def select_block_height(input_hash, current_height):

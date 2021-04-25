@@ -1,10 +1,10 @@
 from time import sleep
 import argparse
 
-from scepticoin.params import SASHIMI_PER_COIN
-from scepticoin.signing import SECP256k1PublicKey
-from scepticoin.wallet import save_wallet
-from scepticoin.wallet import is_valid_address, parse_address, create_spend_transaction
+from skepticoin.params import SASHIMI_PER_COIN
+from skepticoin.signing import SECP256k1PublicKey
+from skepticoin.wallet import save_wallet
+from skepticoin.wallet import is_valid_address, parse_address, create_spend_transaction
 
 from .utils import (
     initialize_peers_file,
@@ -19,11 +19,11 @@ from .utils import (
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("amount", help="The amount of to send", type=int)
-    parser.add_argument("denomination", help="'scepticoin' or 'sashimi'", choices=['scepticoin', 'sashimi'])
+    parser.add_argument("denomination", help="'skepticoin' or 'sashimi'", choices=['skepticoin', 'sashimi'])
     parser.add_argument("address", help="The address to send to")
     args = parser.parse_args()
 
-    value = args.amount * (SASHIMI_PER_COIN if args.denomination == 'scepticoin' else 1)
+    value = args.amount * (SASHIMI_PER_COIN if args.denomination == 'skepticoin' else 1)
 
     if not is_valid_address(args.address):
         print("Invalid address")

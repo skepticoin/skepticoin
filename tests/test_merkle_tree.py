@@ -1,5 +1,5 @@
-from scepticoin.merkletree import get_merkle_root, get_merkle_tree, get_proof
-from scepticoin.hash import sha256d
+from skepticoin.merkletree import get_merkle_root, get_merkle_tree, get_proof
+from skepticoin.hash import sha256d
 
 
 list_of_hashes = [sha256d(b'x' * i) for i in range(40)]

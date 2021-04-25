@@ -2,10 +2,10 @@ from copy import deepcopy
 import immutables
 import pytest
 
-from scepticoin.humans import computer
-from scepticoin.params import SASHIMI_PER_COIN, MAX_COINBASE_RANDOM_DATA_SIZE
-from scepticoin.coinstate import CoinState
-from scepticoin.consensus import (
+from skepticoin.humans import computer
+from skepticoin.params import SASHIMI_PER_COIN, MAX_COINBASE_RANDOM_DATA_SIZE
+from skepticoin.coinstate import CoinState
+from skepticoin.consensus import (
     construct_minable_summary_genesis,
     construct_minable_summary,
     construct_coinbase_transaction,
@@ -21,8 +21,8 @@ from scepticoin.consensus import (
     ValidateTransactionError,
     ValidatePOWError,
 )
-from scepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
-from scepticoin.datatypes import Transaction, OutputReference, Input, Output, Block
+from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
+from skepticoin.datatypes import Transaction, OutputReference, Input, Output, Block
 
 
 example_public_key = SECP256k1PublicKey(b'x' * 64)

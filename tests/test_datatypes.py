@@ -1,5 +1,5 @@
-from scepticoin.signing import SECP256k1Signature, SECP256k1PublicKey
-from scepticoin.datatypes import (
+from skepticoin.signing import SECP256k1Signature, SECP256k1PublicKey
+from skepticoin.datatypes import (
     Block,
     BlockHeader,
     BlockSummary,
@@ -9,7 +9,7 @@ from scepticoin.datatypes import (
     PowEvidence,
     Transaction,
 )
-from scepticoin.humans import computer
+from skepticoin.humans import computer
 
 
 def serialize_and_deserialize(thing):

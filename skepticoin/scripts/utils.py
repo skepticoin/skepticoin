@@ -5,12 +5,12 @@ import os
 import tempfile
 import logging
 
-from scepticoin.datatypes import Block
-from scepticoin.coinstate import CoinState
-from scepticoin.networking.threading import NetworkingThread
-from scepticoin.wallet import Wallet, save_wallet
-from scepticoin.networking.utils import load_peers
-from scepticoin.params import DESIRED_BLOCK_TIMESPAN
+from skepticoin.datatypes import Block
+from skepticoin.coinstate import CoinState
+from skepticoin.networking.threading import NetworkingThread
+from skepticoin.wallet import Wallet, save_wallet
+from skepticoin.networking.utils import load_peers
+from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 
 from time import time, sleep
 
@@ -86,7 +86,7 @@ def start_networking_peer_in_background(coinstate):
 
 
 def configure_logging_for_file():
-    log_filename = Path(tempfile.gettempdir()) / ("scepticoin-networking-%s.log" % int(time()))
+    log_filename = Path(tempfile.gettempdir()) / ("skepticoin-networking-%s.log" % int(time()))
     FORMAT = '%(asctime)s %(message)s'
     logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
 

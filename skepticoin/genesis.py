@@ -13,7 +13,7 @@ from .humans import computer
 #     else comes along with a _newer_ coin that's just as good or better than the old one. No newspaper headline can
 #     guard against that.
 #
-# Thus, Scepticoin's genesis block only does [a].
+# Thus, Skepticoin's genesis block only does [a].
 
 just_believe_in_me = (
     b"You buy a piece of paradise\n"

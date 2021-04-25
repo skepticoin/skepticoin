@@ -1,5 +1,5 @@
-from scepticoin.pow import select_block_height, select_block_slice
-from scepticoin.hash import sha256d
+from skepticoin.pow import select_block_height, select_block_slice
+from skepticoin.hash import sha256d
 
 
 list_of_hashes = [sha256d(b'x' * i) for i in range(40)]

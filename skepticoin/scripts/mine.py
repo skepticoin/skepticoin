@@ -2,11 +2,11 @@ from pathlib import Path
 from decimal import Decimal
 import random
 
-from scepticoin.params import SASHIMI_PER_COIN
-from scepticoin.consensus import construct_block_for_mining
-from scepticoin.signing import SECP256k1PublicKey
-from scepticoin.wallet import save_wallet
-from scepticoin.utils import block_filename
+from skepticoin.params import SASHIMI_PER_COIN
+from skepticoin.consensus import construct_block_for_mining
+from skepticoin.signing import SECP256k1PublicKey
+from skepticoin.wallet import save_wallet
+from skepticoin.utils import block_filename
 from time import time
 
 from .utils import (
@@ -56,7 +56,7 @@ def main():
             with open(Path('chain') / block_filename(block), 'wb') as f:
                 f.write(block.serialize())
             print("FOUND", block_filename(block))
-            print("Wallet balance: %s scepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
+            print("Wallet balance: %s skepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
 
             thread.local_peer.chain_manager.set_coinstate(coinstate)
             thread.local_peer.network_manager.broadcast_block(block)

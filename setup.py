@@ -1,13 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="scepticoin",
+    name="skepticoin",
     description="The Coin for Non-Believers",
     long_description=open("README.md", 'r').read(),
     long_description_content_type='text/markdown',
 
     author="Sashimi Houdini",
-    url="https://github.com/scepticoin/scepticoin/",
+    url="https://github.com/skepticoin/skepticoin/",
 
     install_requires=[
         "scrypt>=0.8.17",
@@ -20,7 +20,7 @@ setup(
 
     setup_requires=["setuptools_scm"],
     use_scm_version={
-        "write_to": "scepticoin/scmversion.py",
+        "write_to": "skepticoin/scmversion.py",
         "write_to_template": "__version__ = '{version}'\n",
     },
 
@@ -28,11 +28,11 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'scepticoin-version=scepticoin.scripts.version:main',
-            'scepticoin-mine=scepticoin.scripts.mine:main',
-            'scepticoin-receive=scepticoin.scripts.receive:main',
-            'scepticoin-send=scepticoin.scripts.send:main',
-            'scepticoin-repl=scepticoin.scripts.repl:main',
+            'skepticoin-version=skepticoin.scripts.version:main',
+            'skepticoin-mine=skepticoin.scripts.mine:main',
+            'skepticoin-receive=skepticoin.scripts.receive:main',
+            'skepticoin-send=skepticoin.scripts.send:main',
+            'skepticoin-repl=skepticoin.scripts.repl:main',
         ],
     },
 

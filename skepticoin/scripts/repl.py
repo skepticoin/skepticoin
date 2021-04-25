@@ -4,13 +4,13 @@ import argparse
 from ptpython.repl import embed, run_config
 from ptpython.entry_points.run_ptpython import get_config_and_history_file
 
-from scepticoin.__version__ import __version__
+from skepticoin.__version__ import __version__
 
-import scepticoin.datatypes
-import scepticoin.networking.messages
-import scepticoin.signing
-import scepticoin.humans
-from scepticoin.params import SASHIMI_PER_COIN
+import skepticoin.datatypes
+import skepticoin.networking.messages
+import skepticoin.signing
+import skepticoin.humans
+from skepticoin.params import SASHIMI_PER_COIN
 
 from .utils import (
     initialize_peers_file,
@@ -51,7 +51,7 @@ def main():
             'SASHIMI_PER_COIN': SASHIMI_PER_COIN,
         }
 
-        for module in [scepticoin.datatypes, scepticoin.networking.messages, scepticoin.signing, scepticoin.humans]:
+        for module in [skepticoin.datatypes, skepticoin.networking.messages, skepticoin.signing, skepticoin.humans]:
             for attr in module.__all__:
                 locals[attr] = getattr(module, attr)
 
@@ -64,7 +64,7 @@ def main():
                 repl.confirm_exit = False
 
             # embedded in other applications.
-            repl.title = "Scepticoin %s " % __version__
+            repl.title = "Skepticoin %s " % __version__
 
         embed(
             vi_mode=args.vi_mode,

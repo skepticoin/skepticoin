@@ -6,6 +6,6 @@ share
 .eggs
 *.egg-info/
 dist
-scepticoin/scmversion.py
+skepticoin/scmversion.py
 
 __pycache__

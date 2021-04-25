@@ -1,4 +1,4 @@
-from scepticoin.signing import (
+from skepticoin.signing import (
     PublicKey, SignableEquivalent, CoinbaseData, Signature, SECP256k1Signature, SECP256k1PublicKey)
 
 

@@ -154,25 +154,25 @@ def save_wallet(wallet):
     os.replace("wallet.json.new", "wallet.json")
 
 
-def is_valid_address(full_scepticoin_address):
+def is_valid_address(full_skepticoin_address):
     try:
-        parse_address(full_scepticoin_address)
+        parse_address(full_skepticoin_address)
         return True
     except AddressParseError:
         return False
 
 
-def parse_address(full_scepticoin_address):
-    if full_scepticoin_address[:3] != "SCE":
+def parse_address(full_skepticoin_address):
+    if full_skepticoin_address[:3] != "SKE":
         raise AddressParseError()
 
-    if full_scepticoin_address[-3:] != "PTI":
+    if full_skepticoin_address[-3:] != "PTI":
         raise AddressParseError()
 
-    if len(full_scepticoin_address) != 3 + 128 + 3:
+    if len(full_skepticoin_address) != 3 + 128 + 3:
         raise AddressParseError()
 
-    if not all(c in '0123456789abcdef' for c in full_scepticoin_address[3:-3]):
+    if not all(c in '0123456789abcdef' for c in full_skepticoin_address[3:-3]):
         raise AddressParseError()
 
-    return computer(full_scepticoin_address[3:-3])
+    return computer(full_skepticoin_address[3:-3])

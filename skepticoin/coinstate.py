@@ -115,7 +115,7 @@ class CoinState:
         return e.add_block_no_validation(Block.deserialize(genesis_block_data))
 
     def add_block(self, block, current_timestamp):
-        from scepticoin.consensus import validate_block_by_itself, validate_block_in_coinstate
+        from skepticoin.consensus import validate_block_by_itself, validate_block_in_coinstate
         validate_block_by_itself(block, current_timestamp)
         validate_block_in_coinstate(block, self)
 

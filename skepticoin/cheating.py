@@ -3,9 +3,9 @@ Generated like so:
 
 >>> import os
 ...
-... from scepticoin.datatypes import Block
-... from scepticoin.coinstate import CoinState
-... from scepticoin.humans import human
+... from skepticoin.datatypes import Block
+... from skepticoin.coinstate import CoinState
+... from skepticoin.humans import human
 ...
 ...
 ... coinstate = CoinState.empty()

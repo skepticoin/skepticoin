@@ -51,7 +51,7 @@ from ..utils import block_filename
 from ..__version__ import __version__
 
 
-logger = logging.getLogger("scepticoin.networking")
+logger = logging.getLogger("skepticoin.networking")
 
 LISTENING_SOCKET = "LISTENING_SOCKET"
 IRRELEVANT = "IRRELEVANT"

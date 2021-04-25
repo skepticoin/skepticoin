@@ -2,7 +2,7 @@ SASHIMI_PER_COIN = 100_000_000  # bitcoin calls this (perhaps somewhat too) simp
 
 # As is customary in the alt-coin sphere, we mess with the Bitcoin params a bit in order to generate an air of
 # uniqueness. Ahum, I meant to say that the following parameters have been carefully chosen to match Bitcoin's total
-# supply of money (remember: 1 scepticoin == 1 btc). However, we have made the block duration significantly shorter to
+# supply of money (remember: 1 skepticoin == 1 btc). However, we have made the block duration significantly shorter to
 # provide a more interactive experience.
 
 FIVE = (10 // 2)  # every 2 minutes. bitcoin has this at 10, so we change the params below with a factor of FIVE
@@ -18,7 +18,7 @@ MAX_COINBASE_RANDOM_DATA_SIZE = 200
 
 # The total amount of money can be deduced from the halving algorithm but is put here as a constant; for bitcoin it is
 # often said to be "21 million" but is actually 2_099_999_997_690_000 satoshi. Because of rounding differences there
-# will be slightly fewer sashimi. The only logical conclusion is that scepticoin is slightly more valuable (deflation!)
+# will be slightly fewer sashimi. The only logical conclusion is that skepticoin is slightly more valuable (deflation!)
 # Note that this fits in 48 bits (and therefore easily in 8 bytes).
 MAX_SASHIMI = 2_099_999_986_350_000
 
