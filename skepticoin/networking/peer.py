@@ -861,3 +861,26 @@ class LocalPeer:
             if head.height != lca.height:
                 print("diverges for %s blocks" % (head.height - lca.height))
             print()
+
+    def show_network_stats(self):
+        print("NETWORK")
+        print("Nr. of connected peers:", len(self.network_manager.get_active_peers()))
+        print("Nr. of unique hosts   :", len(set(p.host for p in self.network_manager.get_active_peers())))
+        print("Nr. of listening hosts:",
+              len([p for p in self.network_manager.get_active_peers() if p.direction == OUTGOING]))
+
+        per_host = {}
+
+        for p in self.network_manager.get_active_peers():
+            if p.host not in per_host:
+                per_host[p.host] = (0, 0)
+
+            incoming, outgoing = per_host[p.host]
+            if p.direction == INCOMING:
+                per_host[p.host] = incoming + 1, outgoing
+            else:
+                per_host[p.host] = incoming, outgoing + 1
+
+        print("\ndetails:")
+        for host, (incoming, outgoing) in per_host.items():
+            print("%15s: %2d incoming, %2d outgoing" % (host, incoming, outgoing))
