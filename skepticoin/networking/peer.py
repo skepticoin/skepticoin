@@ -73,7 +73,8 @@ class Manager:
 
 class NetworkManager(Manager):
 
-    def __init__(self):
+    def __init__(self, local_peer):
+        self.local_peer = local_peer
         self.my_addresses = set()
         self.connected_peers = {}
         self.disconnected_peers = {}
@@ -94,7 +95,7 @@ class NetworkManager(Manager):
 
                 disconnected_peer.last_connection_attempt = current_time
 
-                local_peer.start_outgoing_connection(disconnected_peer)
+                self.local_peer.start_outgoing_connection(disconnected_peer)
 
         for peer in list(self.connected_peers.values()):
             peer.step(current_time)
@@ -105,7 +106,7 @@ class NetworkManager(Manager):
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
         if key in self.connected_peers:
             logger.warning("%15s duplicate peer %s" % (remote_peer.host, key))
-            local_peer.disconnect(self.connected_peers[key], "duplicate")  # just drop the existing one
+            self.local_peer.disconnect(self.connected_peers[key], "duplicate")  # just drop the existing one
 
         self._sanity_check()
         self.connected_peers[key] = remote_peer
@@ -172,7 +173,8 @@ def inventory_batch_handled(peer):
 
 class ChainManager(Manager):
 
-    def __init__(self, current_time):
+    def __init__(self, local_peer, current_time):
+        self.local_peer = local_peer
         self.lock = Lock()
         self.coinstate = None
         self.actively_fetching_blocks_from_peers = []
@@ -184,7 +186,7 @@ class ChainManager(Manager):
             return  # no manual action required, blocks expected to be sent to us instead.
 
         ibd_candidates = [
-            peer for peer in local_peer.network_manager.get_active_peers()
+            peer for peer in self.local_peer.network_manager.get_active_peers()
             if current_time > peer.last_empty_inventory_response_at + EMPTY_INVENTORY_BACKOFF
         ]
 
@@ -301,8 +303,8 @@ class DisconnectedRemotePeer(RemotePeer):
         return ((self.last_connection_attempt is None) or
                 (current_time - self.last_connection_attempt >= TIME_BETWEEN_CONNECTION_ATTEMPTS))
 
-    def as_connected(self, sock):
-        return ConnectedRemotePeer(self.host, self.port, self.direction, self.last_connection_attempt, sock)
+    def as_connected(self, local_peer, sock):
+        return ConnectedRemotePeer(local_peer, self.host, self.port, self.direction, self.last_connection_attempt, sock)
 
 
 class MessageReceiver:
@@ -357,8 +359,9 @@ class InventoryMessageState:
 
 
 class ConnectedRemotePeer(RemotePeer):
-    def __init__(self, host, port, direction, last_connection_attempt, sock):
+    def __init__(self, local_peer, host, port, direction, last_connection_attempt, sock):
         super().__init__(host, port, direction, last_connection_attempt)
+        self.local_peer = local_peer
         self.sock = sock
         self.direction = direction
 
@@ -391,10 +394,10 @@ class ConnectedRemotePeer(RemotePeer):
             port_if_known = self.port if self.port is not IRRELEVANT else 0
 
             my_ip_address = IPv6Address("0::0")  # Unspecified
-            my_port = local_peer.port
+            my_port = self.local_peer.port
 
             hello_message = HelloMessage(
-                [SupportedVersion(0)], ipv4_mapped, port_if_known, my_ip_address, my_port, local_peer.nonce,
+                [SupportedVersion(0)], ipv4_mapped, port_if_known, my_ip_address, my_port, self.local_peer.nonce,
                 b"sashimi " + __version__.encode("utf-8"))
 
             self.hello_sent = True
@@ -435,10 +438,10 @@ class ConnectedRemotePeer(RemotePeer):
             self.start_sending()
 
     def start_sending(self):
-        local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
+        self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
 
     def stop_sending(self):
-        local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
+        self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
 
     def handle_message_received(self, header, message):
         logger.info("%15s ConnectedRemotePeer.handle_message_received(%s %s)" % (
@@ -497,21 +500,21 @@ class ConnectedRemotePeer(RemotePeer):
             # connection if that happens. Probably like so: it's the prober that receives "hello" and then closes
             # because satisifed.
             key = (self.host, message.my_port, OUTGOING)
-            nm = local_peer.network_manager
+            nm = self.local_peer.network_manager
             nm._sanity_check()
             if key not in nm.disconnected_peers and key not in nm.connected_peers:
                 nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING, None)
             nm._sanity_check()
 
-        if self.direction == OUTGOING and message.nonce == local_peer.nonce:
-            local_peer.network_manager.my_addresses.add((self.host, self.port))
-            local_peer.disconnect(self, "connection to self")
+        if self.direction == OUTGOING and message.nonce == self.local_peer.nonce:
+            self.local_peer.network_manager.my_addresses.add((self.host, self.port))
+            self.local_peer.disconnect(self, "connection to self")
 
-        local_peer.network_manager.update_peer_db(self)
+        self.local_peer.network_manager.update_peer_db(self)
 
     def handle_get_blocks_message_received(self, header, message):
         logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
-        coinstate = local_peer.chain_manager.coinstate
+        coinstate = self.local_peer.chain_manager.coinstate
         logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
         for potential_start_hash in message.potential_start_hashes:
             logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
@@ -582,7 +585,7 @@ class ConnectedRemotePeer(RemotePeer):
         return None, None
 
     def check_inventory_messages(self):
-        coinstate = local_peer.chain_manager.coinstate
+        coinstate = self.local_peer.chain_manager.coinstate
 
         msg_state, next_hash = self._get_hash_from_inventory_messages()
         while next_hash is not None and next_hash in coinstate.block_by_hash:
@@ -598,7 +601,7 @@ class ConnectedRemotePeer(RemotePeer):
         if get_data_message.data_type != DATA_BLOCK:
             raise NotImplementedError("We can only deal w/ DATA_BLOCK GetDataMessage objects for now")
 
-        coinstate = local_peer.chain_manager.coinstate
+        coinstate = self.local_peer.chain_manager.coinstate
         if get_data_message.hash not in coinstate.block_by_hash:
             # we simply silently ignore GetDataMessage for hashes we don't have... future work: inc banscore, or ...
             logger.debug("%15s ConnectedRemotePeer.handle_data_message_received for unknown hash %s" % (
@@ -627,7 +630,7 @@ class ConnectedRemotePeer(RemotePeer):
         # TODO deal with out-of-order blocks more gracefully
 
         block = message.data
-        coinstate = local_peer.chain_manager.coinstate
+        coinstate = self.local_peer.chain_manager.coinstate
 
         if block.hash() in coinstate.block_by_hash:
             # implicit here: when you receive a datamessage, this could be because you requested it; and thus you'll
@@ -642,7 +645,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         try:
             coinstate = coinstate.add_block(block, int(time()))  # TODO time() as a pass-along?
-            local_peer.chain_manager.set_coinstate(coinstate)
+            self.local_peer.chain_manager.set_coinstate(coinstate)
 
             # TODO writing blocks to disk should probably not occur here, and should probably a bit more sophisticated.
             with open('chain/%s' % block_filename(block), 'wb') as f:
@@ -661,26 +664,26 @@ class ConnectedRemotePeer(RemotePeer):
             # better to check for that state more explicitly. We don't want to broadcast blocks while in IBD, because in
             # that state the fact that some block is our new head doesn't mean at all that we're talking about the real
             # chain's new head, and only the latter is relevant to the rest of the world.
-            local_peer.network_manager.broadcast_block(block)
+            self.local_peer.network_manager.broadcast_block(block)
 
     def handle_transaction_received(self, header, message):
         transaction = message.data
-        if transaction in local_peer.chain_manager.transaction_pool:
+        if transaction in self.local_peer.chain_manager.transaction_pool:
             return
 
-        if local_peer.chain_manager.add_transaction_to_pool(transaction):
+        if self.local_peer.chain_manager.add_transaction_to_pool(transaction):
             # if this is valid and new... just broadcast it to every peer you know. I'm sure this is inefficient, but
             # at least peers will stop broadcasting once they receive it a second time themselves.
-            local_peer.network_manager.broadcast_transaction(transaction)
+            self.local_peer.network_manager.broadcast_transaction(transaction)
 
     def handle_get_peers_message_received(self, header, message):
         peers = []
 
-        for peer in local_peer.network_manager.connected_peers.values():
+        for peer in self.local_peer.network_manager.connected_peers.values():
             if peer.direction == OUTGOING:
                 peers.append(Peer(int(time()), IPv6Address("::FFFF:%s" % peer.host), peer.port))
 
-        for peer in local_peer.network_manager.disconnected_peers.values():
+        for peer in self.local_peer.network_manager.disconnected_peers.values():
             if peer.direction == OUTGOING:
                 peers.append(Peer(0, IPv6Address("::FFFF:%s" % peer.host), peer.port))  # TODO 'last seen' time.
 
@@ -703,7 +706,7 @@ class ConnectedRemotePeer(RemotePeer):
 
             # TODO factor out copypasta
             key = (host, announced_peer.port, OUTGOING)
-            nm = local_peer.network_manager
+            nm = self.local_peer.network_manager
             nm._sanity_check()
             if key not in nm.disconnected_peers and key not in nm.connected_peers:
                 nm.disconnected_peers[key] = DisconnectedRemotePeer(host, announced_peer.port, OUTGOING, None)
@@ -716,8 +719,8 @@ class LocalPeer:
         self.port = None  # perhaps just push this into the signature here?
         self.nonce = random.randrange(pow(2, 32))
         self.selector = selectors.DefaultSelector()
-        self.network_manager = NetworkManager()
-        self.chain_manager = ChainManager(int(time()))
+        self.network_manager = NetworkManager(self)
+        self.chain_manager = ChainManager(self, int(time()))
         self.managers = [
             self.network_manager,
             self.chain_manager,
@@ -745,7 +748,7 @@ class LocalPeer:
 
         remote_host = conn.getpeername()[0]
         remote_port = conn.getpeername()[1]
-        remote_peer = ConnectedRemotePeer(remote_host, remote_port, INCOMING, None, conn)
+        remote_peer = ConnectedRemotePeer(self, remote_host, remote_port, INCOMING, None, conn)
         self.selector.register(conn, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
 
@@ -809,7 +812,7 @@ class LocalPeer:
         sock.connect_ex(server_addr)
         events = selectors.EVENT_READ
 
-        remote_peer = disconnected_peer.as_connected(sock)
+        remote_peer = disconnected_peer.as_connected(self, sock)
         self.selector.register(sock, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
 
@@ -858,6 +861,3 @@ class LocalPeer:
             if head.height != lca.height:
                 print("diverges for %s blocks" % (head.height - lca.height))
             print()
-
-
-local_peer = LocalPeer()
