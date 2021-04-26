@@ -20,6 +20,8 @@ class DefaultArgumentParser(argparse.ArgumentParser):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.add_argument("--dont-listen", help="Don't listen for incoming connections", action="store_true")
+        self.add_argument("--listening-port", help="Port to listen on", type=int, default=2412)
         self.add_argument("--log-to-file", help="Log to file", action="store_true")
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
 
@@ -86,9 +88,10 @@ def open_or_init_wallet():
     return wallet
 
 
-def start_networking_peer_in_background(coinstate):
+def start_networking_peer_in_background(args, coinstate):
     print("Starting networking peer in background")
-    thread = NetworkingThread(coinstate, 2412)
+    port = None if args.dont_listen else args.listening_port
+    thread = NetworkingThread(coinstate, port)
     thread.local_peer.network_manager.disconnected_peers = load_peers()
     thread.start()
     return thread

@@ -14,7 +14,8 @@ class NetworkingThread(threading.Thread):
         self.local_peer.chain_manager.set_coinstate(coinstate)
 
     def run(self):
-        self.local_peer.start_listening(self.port)
+        if self.port is not None:
+            self.local_peer.start_listening(self.port)
         self.local_peer.run()
 
     def stop(self):

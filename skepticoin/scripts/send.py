@@ -35,7 +35,7 @@ def main():
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
     initialize_peers_file()
-    thread = start_networking_peer_in_background(coinstate)
+    thread = start_networking_peer_in_background(args, coinstate)
 
     try:
         # we need a fresh chain because our wallet doesn't track spending/receiving, so we need to look at the real

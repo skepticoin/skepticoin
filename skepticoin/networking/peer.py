@@ -394,7 +394,7 @@ class ConnectedRemotePeer(RemotePeer):
             port_if_known = self.port if self.port is not IRRELEVANT else 0
 
             my_ip_address = IPv6Address("0::0")  # Unspecified
-            my_port = self.local_peer.port
+            my_port = self.local_peer.port if self.local_peer.port else 0
 
             hello_message = HelloMessage(
                 [SupportedVersion(0)], ipv4_mapped, port_if_known, my_ip_address, my_port, self.local_peer.nonce,

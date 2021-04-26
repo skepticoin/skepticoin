@@ -30,7 +30,7 @@ def main():
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
     initialize_peers_file()
-    thread = start_networking_peer_in_background(coinstate)
+    thread = start_networking_peer_in_background(args, coinstate)
     thread.local_peer.show_stats()
 
     if check_for_fresh_chain(thread):
