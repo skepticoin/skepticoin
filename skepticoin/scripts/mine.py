@@ -16,12 +16,15 @@ from .utils import (
     open_or_init_wallet,
     start_networking_peer_in_background,
     check_for_fresh_chain,
-    configure_logging_by_argv,
+    configure_logging_from_args,
+    DefaultArgumentParser,
 )
 
 
 def main():
-    configure_logging_by_argv()
+    parser = DefaultArgumentParser()
+    args = parser.parse_args()
+    configure_logging_from_args(args)
 
     create_chain_dir()
     coinstate = read_chain_from_disk()

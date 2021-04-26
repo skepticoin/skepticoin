@@ -1,5 +1,4 @@
 import os
-import argparse
 
 from ptpython.repl import embed, run_config
 from ptpython.entry_points.run_ptpython import get_config_and_history_file
@@ -18,6 +17,8 @@ from .utils import (
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
+    configure_logging_from_args,
+    DefaultArgumentParser,
 )
 
 
@@ -29,9 +30,10 @@ class EverythingIsNone:
 def main():
     config_file, history_file = get_config_and_history_file(EverythingIsNone())
 
-    parser = argparse.ArgumentParser()
+    parser = DefaultArgumentParser()
     parser.add_argument("--vi-mode", help="Vi mode", action="store_true")
     args = parser.parse_args()
+    configure_logging_from_args(args)
 
     create_chain_dir()
     coinstate = read_chain_from_disk()

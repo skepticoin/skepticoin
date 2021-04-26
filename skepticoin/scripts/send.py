@@ -1,5 +1,4 @@
 from time import sleep
-import argparse
 
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.signing import SECP256k1PublicKey
@@ -13,15 +12,18 @@ from .utils import (
     open_or_init_wallet,
     start_networking_peer_in_background,
     check_for_fresh_chain,
+    configure_logging_from_args,
+    DefaultArgumentParser,
 )
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = DefaultArgumentParser()
     parser.add_argument("amount", help="The amount of to send", type=int)
     parser.add_argument("denomination", help="'skepticoin' or 'sashimi'", choices=['skepticoin', 'sashimi'])
     parser.add_argument("address", help="The address to send to")
     args = parser.parse_args()
+    configure_logging_from_args(args)
 
     value = args.amount * (SASHIMI_PER_COIN if args.denomination == 'skepticoin' else 1)
 

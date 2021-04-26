@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import tempfile
 import logging
+import argparse
 
 from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
@@ -13,6 +14,14 @@ from skepticoin.networking.utils import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 
 from time import time, sleep
+
+
+class DefaultArgumentParser(argparse.ArgumentParser):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_argument("--log-to-file", help="Log to file", action="store_true")
+        self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
 
 
 def initialize_peers_file():
@@ -96,9 +105,9 @@ def configure_logging_for_stdout():
     logging.basicConfig(format=FORMAT, stream=sys.stdout, level=logging.INFO)
 
 
-def configure_logging_by_argv():
-    if "--log-networking-to-file" in sys.argv:
+def configure_logging_from_args(args):
+    if args.log_to_file:
         configure_logging_for_file()
 
-    if "--log-networking-to-stdout" in sys.argv:
+    if args.log_to_stdout:
         configure_logging_for_stdout()
