@@ -12,6 +12,8 @@ import socket
 import selectors
 import logging
 
+from skepticoin.params import DESIRED_BLOCK_TIMESPAN
+from ..utils import calc_work
 from ..humans import human
 from ..consensus import (
     validate_no_duplicate_output_references_in_transactions,
@@ -884,3 +886,26 @@ class LocalPeer:
         print("\ndetails:")
         for host, (incoming, outgoing) in per_host.items():
             print("%15s: %2d incoming, %2d outgoing" % (host, incoming, outgoing))
+
+    def show_chain_stats(self):
+        coinstate = self.chain_manager.coinstate
+
+        def get_block_timespan_factor(n):
+            # Current block duration over past n block as a factor of DESIRED_BLOCK_TIMESPAN, e.g. 0.5 for twice desired
+            # speed
+            diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
+            return diff / (DESIRED_BLOCK_TIMESPAN * n)
+
+        def get_network_hash_rate(n):
+            total_over_blocks = sum(
+                calc_work(coinstate.at_head.block_by_height[coinstate.head().height - i].target) for i in range(n))
+
+            diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
+
+            return total_over_blocks / diff
+
+        print("WAISTELAND STATS")
+        print("Current target: ", human(coinstate.head().target))
+        print("Current work:   ", calc_work(coinstate.head().target))
+        print("Timespan factor:", get_block_timespan_factor(100))
+        print("Hash rate:      ", get_network_hash_rate(100))
