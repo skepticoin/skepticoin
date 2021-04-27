@@ -233,8 +233,7 @@ class ChainManager(Manager):
             except ValidateTransactionError as e:
                 # TODO: dirty hack at this particular point... to allow for e.g. out-of-order transactions to not take
                 # down the whole peer, but this should more specifically match for a short list of OK problems.
-                self.local_peer.logger.info("%15s INVALID transaction %s" % ("", str(e)))
-                print("Invalid Transaction")
+                self.local_peer.logger.warning("%15s INVALID transaction %s" % ("", str(e)))
                 self.local_peer.disk_interface.save_transaction_for_debugging(transaction)
 
                 return False  # not successful
@@ -799,10 +798,11 @@ class LocalPeer:
             self.disconnect(remote_peer, "OS error")
 
         except Exception as e:
-            print(traceback.format_exc())  # be loud... this is likely a programming error.
             # We take the position that any exception caused is reason to disconnect. This allows the code that talks to
             # peers to not have special cases for exceptions since they will all be caught by this catch-all.
             self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
+            self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
+
             self.disconnect(remote_peer, "Exception")
 
     def disconnect(self, remote_peer, reason=""):
