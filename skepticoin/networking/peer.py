@@ -854,6 +854,9 @@ class LocalPeer:
                 self.handle_selector_events()
         except KeyboardInterrupt:
             print("caught keyboard interrupt, exiting")
+        except Exception:
+            self.logger.error("Uncaught exception in LocalPeer.run()")
+            self.logger.error(traceback.format_exc())
         finally:
             self.selector.close()
 
