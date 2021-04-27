@@ -852,8 +852,6 @@ class LocalPeer:
                 current_time = int(time())
                 self.step_managers(current_time)
                 self.handle_selector_events()
-        except KeyboardInterrupt:
-            print("caught keyboard interrupt, exiting")
         except Exception:
             self.logger.error("Uncaught exception in LocalPeer.run()")
             self.logger.error(traceback.format_exc())
