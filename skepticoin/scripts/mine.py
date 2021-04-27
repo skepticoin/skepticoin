@@ -46,11 +46,21 @@ def main():
             save_wallet(wallet)
 
             nonce = random.randrange(1 << 32)
+            last_round_second = int(time())
+            i = 0
+
             while True:
+                if int(time()) > last_round_second:
+                    print("Hashrate:", i)
+                    last_round_second = int(time())
+                    i = 0
+
                 coinstate, transactions = thread.local_peer.chain_manager.get_state()
                 increasing_time = max(int(time()), coinstate.head().timestamp + 1)
                 block = construct_block_for_mining(
                     coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
+
+                i += 1
                 nonce = (nonce + 1) % (1 << 32)
                 if block.hash() < block.target:
                     break
