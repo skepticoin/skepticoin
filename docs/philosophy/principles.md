@@ -12,4 +12,4 @@
 
 4. The more outrageous the claim, the harder it is to refute
 
-5. In case of emergency, betray your core principles
+5. ~~In case of emergency,~~ betray your core principles
