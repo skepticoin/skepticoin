@@ -835,11 +835,17 @@ class LocalPeer:
 
     def step_managers(self, current_time):
         for manager in self.managers:
+            if not self.running:
+                break
+
             manager.step(current_time)
 
     def handle_selector_events(self):
         events = self.selector.select(timeout=1)  # TODO this is for the managers to do something... tune it though
         for key, mask in events:
+            if not self.running:
+                break
+
             if key.data is LISTENING_SOCKET:
                 self.handle_incoming_connection(key.fileobj)
             else:
@@ -856,9 +862,12 @@ class LocalPeer:
             self.logger.error("Uncaught exception in LocalPeer.run()")
             self.logger.error(traceback.format_exc())
         finally:
+            self.logger.info("%15s LocalPeer selector close" % "")
             self.selector.close()
+            self.logger.info("%15s LocalPeer selector closed" % "")
 
     def stop(self):
+        self.logger.info("%15s LocalPeer.stop()" % "")
         self.running = False
 
     def show_stats(self):

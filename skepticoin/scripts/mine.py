@@ -81,3 +81,4 @@ def main():
         thread.stop()
         print("Waiting for networking thread to stop")
         thread.join()
+        print("Done; waiting for Python-exit")
