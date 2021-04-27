@@ -7,13 +7,18 @@ def get_recent_block_heights(block_height):
     return heights
 
 
-def load_peers():
+def load_peers_from_list(lst):
     from .peer import DisconnectedRemotePeer
+
+    return {
+        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None) for (host, port, direction) in lst
+    }
+
+
+def load_peers():
     try:
         db = [tuple(li) for li in json.loads(open("peers.json").read())]
     except Exception:
         db = []
 
-    return {
-        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None) for (host, port, direction) in db
-    }
+    return load_peers_from_list(db)
