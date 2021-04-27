@@ -130,20 +130,6 @@ class NetworkManager(Manager):
     def get_active_peers(self):
         return [p for p in self.connected_peers.values() if p.hello_sent and p.hello_received]
 
-    def update_peer_db(self, remote_peer):
-        if remote_peer.direction != OUTGOING:
-            return
-
-        # TSTTCPW... really quite barebones like this :-D
-        db = [tuple(li) for li in json.loads(open("peers.json").read())]
-
-        tup = (remote_peer.host, remote_peer.port, remote_peer.direction)
-        if tup not in db:
-            db.append(tup)
-
-        with open("peers.json", "w") as f:
-            json.dump(db, f, indent=4)
-
     def broadcast_block(self, block):
         logger.info("%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash())))
         message = DataMessage(DATA_BLOCK, block)
@@ -250,8 +236,7 @@ class ChainManager(Manager):
                 # down the whole peer, but this should more specifically match for a short list of OK problems.
                 logger.info("%15s INVALID transaction %s" % ("", str(e)))
                 print("Invalid Transaction")
-                with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
-                    f.write(transaction.serialize())
+                self.local_peer.disk_interface.save_transaction_for_debugging(transaction)
 
                 return False  # not successful
 
@@ -512,7 +497,7 @@ class ConnectedRemotePeer(RemotePeer):
             self.local_peer.network_manager.my_addresses.add((self.host, self.port))
             self.local_peer.disconnect(self, "connection to self")
 
-        self.local_peer.network_manager.update_peer_db(self)
+        self.local_peer.disk_interface.update_peer_db(self)
 
     def handle_get_blocks_message_received(self, header, message):
         logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
@@ -648,10 +633,8 @@ class ConnectedRemotePeer(RemotePeer):
         try:
             coinstate = coinstate.add_block(block, int(time()))  # TODO time() as a pass-along?
             self.local_peer.chain_manager.set_coinstate(coinstate)
+            self.local_peer.disk_interface.save_block(block)
 
-            # TODO writing blocks to disk should probably not occur here, and should probably a bit more sophisticated.
-            with open('chain/%s' % block_filename(block), 'wb') as f:
-                f.write(block.serialize())
         except Exception as e:
             # TODO: dirty hack at this particular point... to allow for out-of-order blocks to not take down the whole
             # peer, but this should more specifically match for a short list of OK problems.
@@ -715,9 +698,36 @@ class ConnectedRemotePeer(RemotePeer):
             nm._sanity_check()
 
 
+class DiskInterface:
+    """Catch-all for writing to and reading from disk, factored out to facilitate testing."""
+
+    def save_block(self, block):
+        with open('chain/%s' % block_filename(block), 'wb') as f:
+            f.write(block.serialize())
+
+    def update_peer_db(self, remote_peer):
+        if remote_peer.direction != OUTGOING:
+            return
+
+        # TSTTCPW... really quite barebones like this :-D
+        db = [tuple(li) for li in json.loads(open("peers.json").read())]
+
+        tup = (remote_peer.host, remote_peer.port, remote_peer.direction)
+        if tup not in db:
+            db.append(tup)
+
+        with open("peers.json", "w") as f:
+            json.dump(db, f, indent=4)
+
+    def save_transaction_for_debugging(self, transaction):
+        with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
+            f.write(transaction.serialize())
+
+
 class LocalPeer:
 
-    def __init__(self):
+    def __init__(self, disk_interface=DiskInterface()):
+        self.disk_interface = disk_interface
         self.port = None  # perhaps just push this into the signature here?
         self.nonce = random.randrange(pow(2, 32))
         self.selector = selectors.DefaultSelector()
