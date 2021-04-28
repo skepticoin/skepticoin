@@ -131,6 +131,15 @@ If you have ethical objections against this, you can always go to the
 **A**: The ability to hold 2 directly opposing thoughts in your head is the core of cryptocurrency. If you can't do that
        then this indeed isn't for you.
 
+##
+
+**O**: This thing is fugly and way too technical. It will never gain traction among a sufficiently large group of fools
+       without a pretty GUI.
+
+**A**: Patience, young grasshopper, everything at its time. First we bring in the techies who bring their thorough
+       understanding of crypto-nonsense and steadfast determination to bring it all down to the ground. The tech
+       illiterate are only allowed to join the lower ranks of the pyramid, so that GUI must wait a bit.
+
 ## Getting involved
 
 The best place to find other Skeptics is currently on the [Skepticoin Subreddit](https://www.reddit.com/r/skepticoin/).
