@@ -36,7 +36,7 @@ def main():
     if check_for_fresh_chain(thread):
         thread.local_peer.show_stats()
 
-    print("Starting mining")
+    print("Starting mining: A repeat minter")
 
     try:
         print("Starting main loop")
