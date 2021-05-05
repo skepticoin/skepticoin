@@ -109,8 +109,8 @@ def configure_logging_for_stdout():
 
 
 def configure_logging_from_args(args):
-    if args.log_to_file:
+    if hasattr(args, 'log_to_file'):
         configure_logging_for_file()
 
-    if args.log_to_stdout:
+    if hasattr(args, 'log_to_stdout'):
         configure_logging_for_stdout()
