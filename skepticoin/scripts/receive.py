@@ -1,5 +1,3 @@
-import argparse
-
 from ..humans import human
 
 from .utils import (
@@ -12,7 +10,6 @@ from .utils import (
 
 def main():
     parser = DefaultArgumentParser()
-    parser = argparse.ArgumentParser()
     parser.add_argument("annotation", help="Some text to help you remember a meaning for this receive address.")
     args = parser.parse_args()
     configure_logging_from_args(args)
