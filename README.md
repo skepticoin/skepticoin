@@ -27,7 +27,11 @@ Follow the instructions below, and experience the thrill of being an early
 adopter without any of the guilt of doing something that you deeply don't
 believe in.
 
-The quickstart assumes (for now) that you have Python up and running.
+The quickstart assumes (for now) that you have Python up and running. _The instructions below are written with
+Linux/POSIX in mind._
+
+* If you're a MacOS user, it is presumed that you have installed python3 yourself somehow (e.g. using pyenv).
+* If you're a Windows user, remember to use `Scripts\activate.bat` instead of `.bin/activate`.
 
 ```
 # Installing:
