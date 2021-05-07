@@ -49,7 +49,7 @@ The basics are simple:
 
 This is explained in a bit more detail in the below.
 
-The solving of arbitrary puzzles by computers is called "Proof of Work" in the literature, although Proof of Waiste
+The solving of arbitrary puzzles by computers is called "Proof of Work" in the literature, although Proof of Waste
 would have been more apt, because nothing of value is produced.
 
 The trick is usually that some [cryptographic hash function](https://en.wikipedia.org/wiki/Cryptographic_hash_function)

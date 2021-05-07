@@ -1,5 +1,5 @@
 """
-Proof of Waiste... I mean Work
+Proof of Waste... I mean Work
 
 In general simplicity is one of the main goals in the Skepticoin codebase. The less smoke and mirrors, the more closely
 we can observe the trick. Here we deviate from that approach somewhat, for the following reasons:

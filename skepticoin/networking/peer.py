@@ -466,7 +466,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.send_buffer = self.send_buffer[sent:]
 
         if len(self.send_buffer) == 0:
-            self.stop_sending()  # in principle: waisteful, but easy to reason about.
+            self.stop_sending()  # in principle: wasteful, but easy to reason about.
             self.check_message_backlog()
 
     def handle_receive_data(self, data):
@@ -929,7 +929,7 @@ class LocalPeer:
 
             return total_over_blocks / diff
 
-        print("WAISTELAND STATS")
+        print("WASTELAND STATS")
         print("Current target: ", human(coinstate.head().target))
         print("Current work:   ", calc_work(coinstate.head().target))
         print("Timespan factor:", get_block_timespan_factor(100))
