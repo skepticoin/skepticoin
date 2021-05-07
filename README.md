@@ -114,7 +114,7 @@ If you have ethical objections against this, you can always go to the
 
 **Q:** Is it safe to put my life savings into skepticoin?
 
-**A:** [No](docs/security.md)
+**A:** [No](https://github.com/skepticoin/skepticoin/blob/master/docs/security.md)
 
 ## Commonly raised objections
 
