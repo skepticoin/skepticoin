@@ -35,4 +35,4 @@ jobs:
         flake8 . --show-source --statistics
     - name: Test with pytest
       run: |
-        pytest --tb=native
+        PYTHONPATH=. pytest --tb=native
