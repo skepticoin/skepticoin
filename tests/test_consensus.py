@@ -7,7 +7,7 @@ from skepticoin.params import SASHIMI_PER_COIN, MAX_COINBASE_RANDOM_DATA_SIZE
 from skepticoin.coinstate import CoinState
 from skepticoin.consensus import (
     construct_minable_summary_genesis,
-    construct_minable_summary,
+    # construct_minable_summary,
     construct_coinbase_transaction,
     construct_pow_evidence,
     get_block_subsidy,
