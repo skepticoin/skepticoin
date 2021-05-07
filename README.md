@@ -148,3 +148,11 @@ The best places to find other Skeptics are
   mobile](https://old.reddit.com/r/skepticoin/) if you don't have a Reddit account.)
 
 * [Twitter](https://twitter.com/Skepticoinz)
+
+## Contributing:
+
+Some ways you can contribute to this project:
+
+* Spread the news. ([Remember the first principle])(https://github.com/skepticoin/skepticoin/blob/master/docs/philosophy/principles.md)
+* [Set up port forwarding on your router](https://github.com/skepticoin/skepticoin/blob/master/docs/port-forwarding.md)
+* [File a bug](https://github.com/skepticoin/skepticoin/issues/new) if you have one
