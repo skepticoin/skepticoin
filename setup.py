@@ -10,7 +10,6 @@ setup(
     url="https://github.com/skepticoin/skepticoin/",
 
     install_requires=[
-        "scrypt>=0.8.17",
         "ecdsa>=0.16.1",
         "immutables>=0.15",
         "ptpython",

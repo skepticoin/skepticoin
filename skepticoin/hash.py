@@ -1,5 +1,4 @@
 import hashlib
-from scrypt import hash as scrypt_hash
 
 
 def sha256d(b):
@@ -21,7 +20,15 @@ def scrypt(password, salt):
 
     # buflen 32 was chosen... because scrypt's output is going to through sha256d anyway, so no sense in a greater
     # output space
-    return scrypt_hash(password, salt, N=1 << 15, r=8, p=1, buflen=32)
+    n = 1 << 15
+    r = 8
+    p = 1
+
+    # maxmem must be greater than (n * 2 * r * 64) plus a bit of internal
+    # memory for OpenSSL book keeping.
+    # Basically, set maxmem = (n * 2 * r * 65)
+    maxmem = (n * 2 * r * 65)
+    return hashlib.scrypt(password, salt=salt, n=n, r=r, p=p, dklen=32, maxmem=maxmem)
 
 
 def blake2(b):
