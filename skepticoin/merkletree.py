@@ -72,10 +72,10 @@ def get_proof(merkle_node, index_of_interest):
     return MerkleNode(merkle_node.index, reconstruct(simplified_other, recursion_result))
 
 
-def _chunks(l, chunk_size):
-    """return chunks of chunk_size for list l
+def _chunks(lst, chunk_size):
+    """return chunks of chunk_size for list lst
 
     >>> list(chunks([0, 1, 2, 3, 4], 2))
     [[0, 1], [2, 3], [4]]
     """
-    return (l[i:i + chunk_size] for i in range(0, len(l), chunk_size))
+    return (lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size))

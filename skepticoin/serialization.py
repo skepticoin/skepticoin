@@ -36,9 +36,9 @@ def safe_read(f, n):
     return r
 
 
-def stream_serialize_list(f, l):
-    stream_serialize_vlq(f, len(l))
-    for elem in l:
+def stream_serialize_list(f, lst):
+    stream_serialize_vlq(f, len(lst))
+    for elem in lst:
         elem.stream_serialize(f)
 
 
@@ -50,9 +50,9 @@ def stream_deserialize_list(f, clz):
     return result
 
 
-def serialize_list(l):
+def serialize_list(lst):
     f = BytesIO()
-    stream_serialize_list(f, l)
+    stream_serialize_list(f, lst)
     return f.getvalue()
 
 

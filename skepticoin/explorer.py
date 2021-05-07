@@ -172,7 +172,7 @@ Transaction | Output Index | Value | Address
                             transaction_f.write(f"""{h} | {output_reference.index} | """
                                                 f"""{v} | {a}\n""")
 
-                    transaction_f.write(f"""### Outputs
+                    transaction_f.write("""### Outputs
 
 Value | Address
 --- | ---
@@ -202,7 +202,7 @@ Transaction | Output Index
                 address_f.write(f"""[{h}]({h}.md) | {output_reference.index}\n""")
 
             if len(pkb2.spent_in_transactions) > 0:
-                address_f.write(f"""
+                address_f.write("""
 ## Spent in
 
 Transaction | ...
@@ -213,7 +213,7 @@ Transaction | ...
                     address_f.write(f"""{human(transaction.hash())} | ...\n""")
 
             else:
-                address_f.write(f"""
+                address_f.write("""
 ## Spent in
 
 -- not spent --
