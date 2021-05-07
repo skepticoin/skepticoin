@@ -157,6 +157,6 @@ The best places to find other Skeptics are
 
 Some ways you can contribute to this project:
 
-* Spread the news. ([Remember the first principle])(https://github.com/skepticoin/skepticoin/blob/master/docs/philosophy/principles.md)
+* Spread the news. ([Remember the first principle](https://github.com/skepticoin/skepticoin/blob/master/docs/philosophy/principles.md))
 * [Set up port forwarding on your router](https://github.com/skepticoin/skepticoin/blob/master/docs/port-forwarding.md)
 * [File a bug](https://github.com/skepticoin/skepticoin/issues/new) if you have one
