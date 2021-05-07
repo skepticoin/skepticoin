@@ -142,4 +142,9 @@ If you have ethical objections against this, you can always go to the
 
 ## Getting involved
 
-The best place to find other Skeptics is currently on the [Skepticoin Subreddit](https://www.reddit.com/r/skepticoin/).
+The best places to find other Skeptics are
+
+* [The Skepticoin Subreddit](https://www.reddit.com/r/skepticoin/) (use [old.reddit.com to avoid the popup on
+  mobile](https://old.reddit.com/r/skepticoin/) if you don't have a Reddit account.)
+
+* [Twitter](https://twitter.com/Skepticoinz)
