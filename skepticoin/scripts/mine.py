@@ -8,6 +8,7 @@ from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import save_wallet
 from skepticoin.utils import block_filename
 from time import time
+from datetime import datetime
 
 from .utils import (
     initialize_peers_file,
@@ -69,6 +70,7 @@ def main():
             with open(Path('chain') / block_filename(block), 'wb') as f:
                 f.write(block.serialize())
             print("FOUND", block_filename(block))
+            print(datetime.now())
             print("Wallet balance: %s skepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
 
             thread.local_peer.chain_manager.set_coinstate(coinstate)
