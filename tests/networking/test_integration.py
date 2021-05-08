@@ -15,6 +15,7 @@ from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.networking.utils import load_peers_from_list
 
+CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("../testdata/chain")
 
 class FakeDiskInterface:
     def save_block(self, block):
@@ -28,17 +29,14 @@ class FakeDiskInterface:
 
 
 def _read_chain_from_disk(max_height):
-    # the requirement to run these tests from an environment that has access to the real blockchain is hard-coded (for
-    # now)
-
     coinstate = CoinState.zero()
 
-    for filename in sorted(os.listdir('chain')):
-        height = int(filename.split("-")[0])
+    for file_path in sorted(CHAIN_TESTDATA_PATH.iterdir()):
+        height = int(file_path.name.split("-")[0])
         if height > max_height:
             return coinstate
 
-        block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
+        block = Block.stream_deserialize(open(file_path, 'rb'))
         coinstate = coinstate.add_block_no_validation(block)
 
     return coinstate
