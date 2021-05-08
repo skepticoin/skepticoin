@@ -9,3 +9,4 @@ dist
 skepticoin/scmversion.py
 
 __pycache__
+*.code-workspace
