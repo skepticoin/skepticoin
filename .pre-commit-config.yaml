@@ -28,4 +28,4 @@ repos:
     hooks:
     -   id: mypy
         exclude: tests/
-        args: [--strict, --allow-any-generics, --ignore-missing-imports]
+        args: [--strict, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]

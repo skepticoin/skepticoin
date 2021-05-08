@@ -7,7 +7,7 @@ from .utils import (
 )
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument(
         "annotation",

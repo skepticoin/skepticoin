@@ -1,8 +1,8 @@
 import struct
 from ipaddress import IPv6Address
 
-from ..datatypes import Block, BlockHeader, Transaction
-from ..serialization import (
+from skepticoin.datatypes import Block, BlockHeader, Transaction
+from skepticoin.serialization import (
     DeserializationError,
     Serializable,
     safe_read,

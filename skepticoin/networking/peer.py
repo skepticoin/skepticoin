@@ -11,17 +11,17 @@ from ipaddress import IPv6Address
 from threading import Lock
 from time import time
 
-from skepticoin.params import DESIRED_BLOCK_TIMESPAN
-
-from ..__version__ import __version__
-from ..consensus import (
+from skepticoin.__version__ import __version__
+from skepticoin.consensus import (
     ValidateTransactionError,
     validate_no_duplicate_output_references_in_transactions,
     validate_non_coinbase_transaction_by_itself,
     validate_non_coinbase_transaction_in_coinstate,
 )
-from ..humans import human
-from ..utils import block_filename, calc_work
+from skepticoin.humans import human
+from skepticoin.params import DESIRED_BLOCK_TIMESPAN
+from skepticoin.utils import block_filename, calc_work
+
 from .messages import (
     DATA_BLOCK,
     DATA_TRANSACTION,

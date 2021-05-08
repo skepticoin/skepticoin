@@ -1,5 +1,6 @@
 import struct
 from io import BytesIO
+from typing import Any, List, Type
 
 
 class DeserializationError(Exception):
@@ -15,20 +16,23 @@ class SerializationTruncationError(SerializationError):
 
 
 class Serializable:
-    def serialize(self):
+    def serialize(self) -> bytes:
         f = BytesIO()
         self.stream_serialize(f)
         return f.getvalue()
 
     @classmethod
-    def deserialize(cls, bytes_):
+    def deserialize(cls, bytes_: bytes) -> Any:
         f = BytesIO(bytes_)
         f.seek(0)
-        return cls.stream_deserialize(f)
+        return cls.stream_deserialize(f)  # type: ignore
+
+    def stream_serialize(self, f: BytesIO) -> None:
+        raise NotImplementedError
 
 
-def safe_read(f, n):
-    r = f.read(n)
+def safe_read(f: BytesIO, n: int) -> bytes:
+    r: bytes = f.read(n)
 
     if len(r) < n:
         raise SerializationTruncationError(
@@ -38,33 +42,33 @@ def safe_read(f, n):
     return r
 
 
-def stream_serialize_list(f, lst):
+def stream_serialize_list(f: BytesIO, lst: List[Serializable]) -> None:
     stream_serialize_vlq(f, len(lst))
     for elem in lst:
         elem.stream_serialize(f)
 
 
-def stream_deserialize_list(f, clz):
-    result = []
+def stream_deserialize_list(f: BytesIO, clz: Type) -> List[Any]:
+    result: List[Type] = []
     length = stream_deserialize_vlq(f)
-    for i in range(length):
+    for _ in range(length):
         result.append(clz.stream_deserialize(f))
     return result
 
 
-def serialize_list(lst):
+def serialize_list(lst: List[Serializable]) -> bytes:
     f = BytesIO()
     stream_serialize_list(f, lst)
     return f.getvalue()
 
 
-def deserialize_list(cls, bytes_):
+def deserialize_list(cls: Type, bytes_: bytes) -> Any:
     f = BytesIO(bytes_)
     f.seek(0)
     return cls.stream_deserialize(f)
 
 
-def stream_serialize_vlq(f, i):
+def stream_serialize_vlq(f: BytesIO, i: int) -> None:
     r"""From wikipedia: https://en.wikipedia.org/wiki/Variable-length_quantity
 
     The encoding assumes an octet (an eight-bit byte) where the most significant bit (MSB), also commonly known as the
@@ -72,9 +76,9 @@ def stream_serialize_vlq(f, i):
 
     If the MSB is 0, then this is the last VLQ octet of the integer, if it is 1, then another VLQ octet follows. The
     other 7 bits are treated as a 7-bit number. The VLQ octets are arranged most significant first in a stream."""
-    needed_bytes = (i.bit_length() // 7) + 1
+    needed_bytes: int = (i.bit_length() // 7) + 1
 
-    mod = None
+    mod = 0
     for j in reversed(range(needed_bytes)):
         div = pow(128, j)
         f.write(
@@ -83,7 +87,7 @@ def stream_serialize_vlq(f, i):
         mod = div
 
 
-def stream_deserialize_vlq(f):
+def stream_deserialize_vlq(f: BytesIO) -> int:
     """ """
     result = 0
 
