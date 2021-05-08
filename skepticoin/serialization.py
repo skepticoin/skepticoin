@@ -1,6 +1,6 @@
 import struct
 from io import BytesIO
-from typing import Any, List, Type
+from typing import Any, List, Sequence, Type
 
 
 class DeserializationError(Exception):
@@ -42,7 +42,7 @@ def safe_read(f: BytesIO, n: int) -> bytes:
     return r
 
 
-def stream_serialize_list(f: BytesIO, lst: List[Serializable]) -> None:
+def stream_serialize_list(f: BytesIO, lst: Sequence[Serializable]) -> None:
     stream_serialize_vlq(f, len(lst))
     for elem in lst:
         elem.stream_serialize(f)

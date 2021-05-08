@@ -1,8 +1,12 @@
-from .hash import sha256d
-from .humans import human
+from __future__ import annotations
+
+from typing import Callable, List, Optional, TypeVar, Tuple
+
+from skepticoin.hash import sha256d
+from skepticoin.humans import human
 
 
-def get_merkle_root(list_of_hashes):
+def get_merkle_root(list_of_hashes: List[bytes]) -> bytes:
     if len(list_of_hashes) == 1:
         return list_of_hashes[0]
 
@@ -17,13 +21,15 @@ def get_merkle_root(list_of_hashes):
 
 
 class MerkleNode:
-    def __init__(self, index, children, value=None):
+    def __init__(
+        self, index: int, children: List[MerkleNode], value: Optional[bytes] = None
+    ):
         # for non-leaves index is a lower-bound of all leaves' indexes
         self.index = index
         self.children = children
         self.value = value
 
-    def hash(self):
+    def hash(self) -> bytes:
         if len(self.children) > 0 and self.value is not None:
             raise ValueError("Only store values at the leaves")
 
@@ -32,54 +38,59 @@ class MerkleNode:
 
         return sha256d(b"".join(c.hash() for c in self.children))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "M(%s, (%s))" % (human(self.hash())[:7], self.children)
 
 
-def _get_merkle_tree(list_of_nodes):
+def _get_merkle_tree(list_of_nodes: List[MerkleNode]) -> MerkleNode:
     if len(list_of_nodes) == 1:
         return list_of_nodes[0]
 
     new_list = []
     for chunk in _chunks(list_of_nodes, 2):
         if len(chunk) == 2:
-            new_list.append(MerkleNode(chunk[0].index, (chunk[0], chunk[1])))
+            new_list.append(MerkleNode(chunk[0].index, [chunk[0], chunk[1]]))
         else:  # implied: len(chunk) == 1
             new_list.append(chunk[0])
 
     return _get_merkle_tree(new_list)
 
 
-def get_merkle_tree(list_of_hashes):
+def get_merkle_tree(list_of_hashes: List[bytes]) -> MerkleNode:
     return _get_merkle_tree(
-        [MerkleNode(i, (), h) for (i, h) in enumerate(list_of_hashes)]
+        [MerkleNode(i, [], h) for (i, h) in enumerate(list_of_hashes)]
     )
 
 
-def get_proof(merkle_node, index_of_interest):
+def get_proof(merkle_node: MerkleNode, index_of_interest: int) -> MerkleNode:
     if not merkle_node.children:
         return merkle_node
+
+    reconstruct: Callable[[MerkleNode, MerkleNode], List[MerkleNode]]
 
     # our nodes always have either 0 or 2 children, never 1
     if index_of_interest >= merkle_node.children[1].index:
         other, recurse_into = merkle_node.children
-        reconstruct = lambda ot, rec: (ot, rec)  # noqa
+        reconstruct = lambda ot, rec: [ot, rec]
     else:
         recurse_into, other = merkle_node.children
-        reconstruct = lambda ot, rec: (rec, ot)  # noqa
+        reconstruct = lambda ot, rec: [rec, ot]
 
-    simplified_other = MerkleNode(other.index, (), other.hash())
+    simplified_other = MerkleNode(other.index, [], other.hash())
     recursion_result = get_proof(recurse_into, index_of_interest)
+
+
 
     return MerkleNode(
         merkle_node.index, reconstruct(simplified_other, recursion_result)
     )
 
+T = TypeVar('T')
 
-def _chunks(lst, chunk_size):
+def _chunks(lst: List[T], chunk_size: int) -> List[List[T]]:
     """return chunks of chunk_size for list lst
 
     >>> list(chunks([0, 1, 2, 3, 4], 2))
     [[0, 1], [2, 3], [4]]
     """
-    return (lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size))
+    return list(lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size))

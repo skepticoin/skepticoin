@@ -4,11 +4,6 @@ import immutables
 import pytest
 
 from skepticoin.coinstate import CoinState
-from skepticoin.datatypes import Block, Input, Output, OutputReference, Transaction
-from skepticoin.humans import computer
-from skepticoin.params import MAX_COINBASE_RANDOM_DATA_SIZE, SASHIMI_PER_COIN
-from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
-
 from skepticoin.consensus import (  # construct_minable_summary,; validate_non_coinbase_transaction_in_coinstate,
     ValidateBlockError,
     ValidateBlockHeaderError,
@@ -23,6 +18,10 @@ from skepticoin.consensus import (  # construct_minable_summary,; validate_non_c
     validate_block_header_by_itself,
     validate_coinbase_transaction_by_itself,
 )
+from skepticoin.datatypes import Block, Input, Output, OutputReference, Transaction
+from skepticoin.humans import computer
+from skepticoin.params import MAX_COINBASE_RANDOM_DATA_SIZE, SASHIMI_PER_COIN
+from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
 
 example_public_key = SECP256k1PublicKey(b"x" * 64)
 

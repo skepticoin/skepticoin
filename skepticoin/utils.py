@@ -8,4 +8,4 @@ def block_filename(block: Block) -> str:
 
 
 def calc_work(target: bytes) -> int:
-    return pow(2, 32 * 8) // int.from_bytes(target, byteorder="big", signed=False)
+    return pow(2, 32 * 8) // int.from_bytes(target, byteorder="big", signed=False)  # type: ignore
