@@ -11,20 +11,22 @@ we can observe the trick. Here we deviate from that approach somewhat, for the f
   last.
 """
 
+from typing import Callable
+
 from skepticoin.hash import sha256d
+from skepticoin.serialization import Serializable
 
 
-def select_block_height(input_hash, current_height):
+def select_block_height(input_hash: bytes, current_height: int) -> int:
     # we interpret the first 8 bytes of the input_hash as a number, and then modulo height. This should be enough for
     # the near future because (1 << 64) // (60 * 60 * 24 * 365) == 584_942_417_355 years if we use 1s blocks
 
     # current_height is the height of the block which hash we're mining/verifying
-
     base = int.from_bytes(input_hash[:8], byteorder="big", signed=False)
     return base % current_height
 
 
-def select_block_slice(hash, serialized_block, length):
+def select_block_slice(hash: bytes, serialized_block: bytes, length: int) -> bytes:
     # we interpret the next 4 bytes of the hash as a number, and then modulo block length. Support for up to 4GiB blocks
 
     base = int.from_bytes(hash[8:12], byteorder="big", signed=False)
@@ -38,7 +40,12 @@ def select_block_slice(hash, serialized_block, length):
     return result
 
 
-def select_slice_from_chain(input_hash, current_height, get_block_by_height, length):
+def select_slice_from_chain(
+    input_hash: bytes,
+    current_height: int,
+    get_block_by_height: Callable[..., Serializable],
+    length: int,
+) -> bytes:
     selected_block_height = select_block_height(input_hash, current_height)
 
     selected_block = get_block_by_height(selected_block_height)
@@ -47,8 +54,12 @@ def select_slice_from_chain(input_hash, current_height, get_block_by_height, len
 
 
 def select_n_k_length_slices_from_chain(
-    starting_hash, current_height, get_block_by_height, n, k
-):
+    starting_hash: bytes,
+    current_height: int,
+    get_block_by_height: Callable[..., Serializable],
+    n: int,
+    k: int,
+) -> bytes:
     result = []
 
     current_hash = starting_hash

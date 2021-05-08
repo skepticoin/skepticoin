@@ -141,7 +141,7 @@ def construct_coinbase_transaction(
     return Transaction(inputs=[input], outputs=[output])
 
 
-def construct_pow_evidence(coinstate, summary, current_height, transactions):
+def construct_pow_evidence(coinstate: CoinState, summary, current_height, transactions):
     # Part 1 of the POW is to run scrypt. We put the most expensive operation first in an attempt to "up the ante"
     summary_hash = scrypt(
         summary.serialize(), current_height.to_bytes(8, byteorder="big")
