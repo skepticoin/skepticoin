@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 from collections import namedtuple
+from typing import Mapping
 
 import immutables
 
-from .datatypes import Block, OutputReference
-from .genesis import genesis_block_data
-from .humans import human
+from skepticoin.datatypes import Block, OutputReference, Transaction
+from skepticoin.genesis import genesis_block_data
+from skepticoin.humans import human
 
 PKBalance = namedtuple("PKBalance", ["value", "output_references"])
 
 
-def uto_apply_transaction(unspent_transaction_outs, transaction, is_coinbase):
+def uto_apply_transaction(
+    unspent_transaction_outs, transaction: Transaction, is_coinbase: bool
+):
     with unspent_transaction_outs.mutate() as mutable_unspent_transaction_outs:
 
         # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
@@ -98,9 +103,9 @@ def pkb_apply_block(unspent_transaction_outs, public_key_balances, block):
 class CoinState:
     def __init__(
         self,
-        block_by_hash,
+        block_by_hash: Mapping[bytes, Block],
         unspent_transaction_outs_by_hash,
-        block_by_height_by_hash,
+        block_by_height_by_hash: Mapping[bytes, Mapping[int, Block]],
         heads,
         current_chain_hash,
         public_key_balances_by_hash,
@@ -145,7 +150,7 @@ class CoinState:
         e = cls.empty()
         return e.add_block_no_validation(Block.deserialize(genesis_block_data))
 
-    def add_block(self, block, current_timestamp):
+    def add_block(self, block: Block, current_timestamp: int) -> CoinState:
         from skepticoin.consensus import (
             validate_block_by_itself,
             validate_block_in_coinstate,
@@ -156,7 +161,7 @@ class CoinState:
 
         return self.add_block_no_validation(block)
 
-    def add_block_no_validation(self, block):
+    def add_block_no_validation(self, block: Block) -> None:
         if block.previous_block_hash == b"\00" * 32:
             unspent_transaction_outs = immutables.Map()
             public_key_balances = immutables.Map()

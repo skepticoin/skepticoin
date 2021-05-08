@@ -1,5 +1,5 @@
-from ..humans import human
-from .utils import (
+from skepticoin.humans import human
+from skepticoin.scripts.utils import (
     DefaultArgumentParser,
     configure_logging_from_args,
     open_or_init_wallet,

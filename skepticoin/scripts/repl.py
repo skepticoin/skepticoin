@@ -1,7 +1,8 @@
 import os
 
+from _typeshed import NoneType
 from ptpython.entry_points.run_ptpython import get_config_and_history_file
-from ptpython.repl import embed, run_config
+from ptpython.repl import PythonRepl, embed, run_config
 
 import skepticoin.datatypes
 import skepticoin.humans
@@ -22,11 +23,11 @@ from .utils import (
 
 
 class EverythingIsNone:
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> None:
         return None
 
 
-def main():
+def main() -> None:
     config_file, history_file = get_config_and_history_file(EverythingIsNone())
 
     parser = DefaultArgumentParser()
@@ -61,7 +62,7 @@ def main():
             for attr in module.__all__:
                 locals[attr] = getattr(module, attr)
 
-        def configure(repl) -> None:
+        def configure(repl: PythonRepl) -> None:
             if os.path.exists(config_file):
                 run_config(repl, config_file)
             else:

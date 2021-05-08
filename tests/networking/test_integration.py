@@ -11,8 +11,8 @@ from time import sleep, time
 
 from skepticoin.coinstate import CoinState
 from skepticoin.datatypes import Block
+from skepticoin.networking.peer import load_peers_from_list
 from skepticoin.networking.threading import NetworkingThread
-from skepticoin.networking.utils import load_peers_from_list
 
 
 class FakeDiskInterface:

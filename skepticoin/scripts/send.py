@@ -1,5 +1,6 @@
 from time import sleep
 
+from skepticoin.coinstate import CoinState
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import (
@@ -21,7 +22,7 @@ from .utils import (
 )
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument("amount", help="The amount of to send", type=int)
     parser.add_argument(
@@ -74,6 +75,10 @@ def main():
 
             # it's late and I'm too lazy for the efficient & correct implementation.
             coinstate = thread.local_peer.chain_manager.coinstate
+
+            # TODO mypy complains coinstate could be None here
+            assert coinstate
+
             max_height = coinstate.head().height
 
             for i in range(10):

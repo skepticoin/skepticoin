@@ -10,14 +10,17 @@ from io import BytesIO
 from ipaddress import IPv6Address
 from threading import Lock
 from time import time
+from typing import Dict, List, Optional, Tuple
 
 from skepticoin.__version__ import __version__
+from skepticoin.coinstate import CoinState
 from skepticoin.consensus import (
     ValidateTransactionError,
     validate_no_duplicate_output_references_in_transactions,
     validate_non_coinbase_transaction_by_itself,
     validate_non_coinbase_transaction_in_coinstate,
 )
+from skepticoin.datatypes import Transaction
 from skepticoin.humans import human
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.utils import block_filename, calc_work
@@ -49,7 +52,6 @@ from .params import (
     SWITCH_TO_ACTIVE_MODE_TIMEOUT,
     TIME_BETWEEN_CONNECTION_ATTEMPTS,
 )
-from .utils import get_recent_block_heights
 
 LISTENING_SOCKET = "LISTENING_SOCKET"
 IRRELEVANT = "IRRELEVANT"
@@ -181,10 +183,10 @@ class ChainManager(Manager):
     def __init__(self, local_peer, current_time):
         self.local_peer = local_peer
         self.lock = Lock()
-        self.coinstate = None
+        self.coinstate: Optional[CoinState] = None
         self.actively_fetching_blocks_from_peers = []
         self.started_at = current_time
-        self.transaction_pool = []
+        self.transaction_pool: List[Transaction] = []
 
     def step(self, current_time):
         if not self.should_actively_fetch_blocks(current_time):
@@ -283,7 +285,7 @@ class ChainManager(Manager):
 
         return True  # successfully added
 
-    def get_state(self):
+    def get_state(self) -> Tuple[CoinState, List[Transaction]]:
         with self.lock:
             return self.coinstate, self.transaction_pool
 
@@ -1125,3 +1127,28 @@ class LocalPeer:
         print("Current work:   ", calc_work(coinstate.head().target))
         print("Timespan factor:", get_block_timespan_factor(100))
         print("Hash rate:      ", get_network_hash_rate(100))
+
+
+def get_recent_block_heights(block_height: int) -> List[int]:
+    oldness = list(range(10)) + [pow(x, 2) for x in range(4, 64)]
+    heights = [x for x in [block_height - o for o in oldness] if x >= 0]
+    return heights
+
+
+def load_peers_from_list(
+    lst: List[Tuple[str, int, str]]
+) -> Dict[Tuple[str, int, str], DisconnectedRemotePeer]:
+
+    return {
+        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None)
+        for (host, port, direction) in lst
+    }
+
+
+def load_peers() -> Dict[Tuple[str, int, str], DisconnectedRemotePeer]:
+    try:
+        db = [tuple(li) for li in json.loads(open("peers.json").read())]
+    except Exception:
+        db = []
+
+    return load_peers_from_list(db)  # type: ignore

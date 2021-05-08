@@ -1,9 +1,11 @@
 import json
 import os
+from io import BytesIO, IOBase
+from typing import Dict, List
 
 import ecdsa
 
-from .coinstate import PKBalance
+from .coinstate import CoinState, PKBalance
 from .datatypes import Input, Output, Transaction
 from .humans import computer, human
 from .signing import SECP256k1PublicKey, SECP256k1Signature
@@ -14,7 +16,12 @@ class AddressParseError(Exception):
 
 
 class Wallet:
-    def __init__(self, keypairs, unused_public_keys, public_key_annotations):
+    def __init__(
+        self,
+        keypairs: Dict[bytes, bytes],
+        unused_public_keys: List[bytes],
+        public_key_annotations: Dict[bytes, str],
+    ):
         self.keypairs = keypairs  # public => private
 
         self.unused_public_keys = unused_public_keys
@@ -22,25 +29,25 @@ class Wallet:
 
         self.spent_transaction_outputs = set()  # TODO save to disk too at some point.
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Wallet w/ %s keypairs" % len(self.keypairs)
 
     @classmethod
-    def empty(cls):
+    def empty(cls) -> Wallet:
         return cls({}, [], {})
 
-    def __getitem__(self, public_key):
+    def __getitem__(self, public_key: bytes) -> bytes:
         return self.keypairs[public_key]
 
-    def __contains__(self, public_key):
+    def __contains__(self, public_key: bytes) -> bool:
         return public_key in self.keypairs
 
-    def get_annotated_public_key(self, annotation):
+    def get_annotated_public_key(self, annotation: str) -> bytes:
         public_key = self.unused_public_keys.pop()
         self.public_key_annotations[public_key] = annotation
         return public_key
 
-    def generate_key(self):
+    def generate_key(self) -> None:
         sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)
         private_key = (
             sk.to_string()
@@ -49,11 +56,11 @@ class Wallet:
         self.keypairs[public_key] = private_key
         self.unused_public_keys.append(public_key)
 
-    def generate_keys(self, n=100):
-        for i in range(n):
+    def generate_keys(self, n=100) -> None:
+        for _ in range(n):
             self.generate_key()
 
-    def dump(self, f):
+    def dump(self, f: IOBase) -> None:
         # The Simplest Thing That Could Possibly Work (though not the most secure)
         json.dump(
             {
@@ -69,7 +76,7 @@ class Wallet:
         )
 
     @classmethod
-    def load(cls, f):
+    def load(cls, f: IOBase) -> None:
         d = json.load(f)
 
         return cls(
@@ -81,7 +88,7 @@ class Wallet:
             },
         )
 
-    def get_balance(self, coinstate):
+    def get_balance(self, coinstate: CoinState) -> int:
         return sum(
             coinstate.public_key_balances_by_hash[coinstate.current_chain_hash]
             .get(SECP256k1PublicKey(pk), PKBalance(0, []))
@@ -124,8 +131,13 @@ def sign_transaction(wallet, unspent_transaction_outs, transaction):
 
 
 def create_spend_transaction(
-    wallet, coinstate, value, miners_fee, output_public_key, change_address
-):
+    wallet: Wallet,
+    coinstate: CoinState,
+    value: int,
+    miners_fee: int,
+    output_public_key: SECP256k1PublicKey,
+    change_address: SECP256k1PublicKey,
+) -> Transaction:
     collected_value = 0
     inputs = []
 
@@ -167,7 +179,7 @@ def create_spend_transaction(
     raise Exception("Insufficient balance")
 
 
-def save_wallet(wallet):
+def save_wallet(wallet: Wallet) -> None:
     # This manual handling of files is sure to create wallet file corruption at one point or another... oh well,
     # reliving the bitcoin experience one mistake at a time.
 
@@ -177,7 +189,7 @@ def save_wallet(wallet):
     os.replace("wallet.json.new", "wallet.json")
 
 
-def is_valid_address(full_skepticoin_address):
+def is_valid_address(full_skepticoin_address: str) -> bool:
     try:
         parse_address(full_skepticoin_address)
         return True
@@ -185,7 +197,7 @@ def is_valid_address(full_skepticoin_address):
         return False
 
 
-def parse_address(full_skepticoin_address):
+def parse_address(full_skepticoin_address: str) -> bytes:
     if full_skepticoin_address[:3] != "SKE":
         raise AddressParseError()
 

@@ -10,7 +10,7 @@ from .utils import (
 )
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     args = parser.parse_args()
     configure_logging_from_args(args)

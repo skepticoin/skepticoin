@@ -24,7 +24,7 @@ PKBalance2 = namedtuple(
 )
 
 
-def show_coin(sashimi):
+def show_coin(sashimi: float) -> str:
     return "%.08f SKEPTI" % (Decimal(sashimi) / SASHIMI_PER_COIN)
 
 
