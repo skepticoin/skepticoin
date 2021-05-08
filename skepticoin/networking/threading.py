@@ -1,11 +1,10 @@
 import threading
 
-from .peer import LocalPeer, DiskInterface
 from .params import PORT
+from .peer import DiskInterface, LocalPeer
 
 
 class NetworkingThread(threading.Thread):
-
     def __init__(self, coinstate, port=PORT, disk_interface=DiskInterface()):
         super().__init__(name="NetworkingThread")
         self.port = port

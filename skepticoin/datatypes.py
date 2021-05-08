@@ -1,17 +1,17 @@
 import struct
 
+from .hash import sha256d
 from .humans import human
+from .params import CHAIN_SAMPLE_TOTAL_SIZE
 from .serialization import (
-    safe_read,
     Serializable,
+    safe_read,
     stream_deserialize_list,
     stream_deserialize_vlq,
     stream_serialize_list,
     stream_serialize_vlq,
 )
-from .signing import Signature, PublicKey, SignableEquivalent
-from .hash import sha256d
-from .params import CHAIN_SAMPLE_TOTAL_SIZE
+from .signing import PublicKey, SignableEquivalent, Signature
 
 
 class OutputReference(Serializable):
@@ -19,10 +19,10 @@ class OutputReference(Serializable):
 
     def __init__(self, hash, index):
         if not len(hash) == 32:
-            raise ValueError('OutputReference hash must be 32 bytes.')
+            raise ValueError("OutputReference hash must be 32 bytes.")
 
-        if not (0 <= index <= 0xffffffff):
-            raise ValueError('OutputReference index out of range.' % index)
+        if not (0 <= index <= 0xFFFFFFFF):
+            raise ValueError("OutputReference index out of range." % index)
 
         self.hash = hash
         self.index = index
@@ -47,7 +47,7 @@ class OutputReference(Serializable):
         f.write(struct.pack(b">I", self.index))
 
     def references_thin_air(self):
-        return (self.hash == b'\x00' * 32) and (self.index == 0)
+        return (self.hash == b"\x00" * 32) and (self.index == 0)
 
 
 class Input(Serializable):
@@ -64,7 +64,10 @@ class Input(Serializable):
         return "Input(%s, %s)" % (self.output_reference, self.signature)
 
     def __eq__(self, other):
-        return self.output_reference == other.output_reference and self.signature == other.signature
+        return (
+            self.output_reference == other.output_reference
+            and self.signature == other.signature
+        )
 
     @classmethod
     def stream_deserialize(cls, f):
@@ -79,8 +82,7 @@ class Input(Serializable):
     def signable_equivalent(self):
         # we simply replace the signature with a SignableEquivalent (which serializes to a type-byte)
         return Input(
-            output_reference=self.output_reference,
-            signature=SignableEquivalent()
+            output_reference=self.output_reference, signature=SignableEquivalent()
         )
 
 
@@ -109,9 +111,10 @@ class Output(Serializable):
 
 
 class Transaction(Serializable):
-
     def __init__(self, inputs, outputs):
-        self.version = 0  # reserved for future use; the class does not take this as a param.
+        self.version = (
+            0  # reserved for future use; the class does not take this as a param.
+        )
         self.inputs = inputs
         self.outputs = outputs
 
@@ -123,7 +126,7 @@ class Transaction(Serializable):
 
     @classmethod
     def stream_deserialize(cls, f):
-        if safe_read(f, 1) != b'\x00':
+        if safe_read(f, 1) != b"\x00":
             raise ValueError("Current version supports only version 0 transactions")
 
         inputs = stream_deserialize_list(f, Input)
@@ -151,7 +154,6 @@ class Transaction(Serializable):
 
 
 class PowEvidence(Serializable):
-
     def __init__(self, summary_hash, chain_sample, block_hash):
         self.summary_hash = summary_hash
         self.chain_sample = chain_sample
@@ -162,14 +164,14 @@ class PowEvidence(Serializable):
             human(self.summary_hash),
             human(self.chain_sample),
             human(self.block_hash),
-            )
+        )
 
     def __eq__(self, other):
         return (
-            isinstance(other, PowEvidence) and
-            self.summary_hash == other.summary_hash and
-            self.chain_sample == other.chain_sample and
-            self.block_hash == other.block_hash
+            isinstance(other, PowEvidence)
+            and self.summary_hash == other.summary_hash
+            and self.chain_sample == other.chain_sample
+            and self.block_hash == other.block_hash
         )
 
     @classmethod
@@ -189,7 +191,9 @@ class PowEvidence(Serializable):
 class BlockSummary(Serializable):
     # akin to Bitcoin's BlockHeader. Our BlockHeader contains an PowEvidence also though, so we need an extra layer
 
-    def __init__(self, height, previous_block_hash, merkle_root_hash, timestamp, target, nonce):
+    def __init__(
+        self, height, previous_block_hash, merkle_root_hash, timestamp, target, nonce
+    ):
         # block height is included here to allow for partial validation of the POW in absence of the full block. (block
         # height is needed to calculate the blocks to sample from in chain_sample).
         self.height = height
@@ -208,12 +212,12 @@ class BlockSummary(Serializable):
 
     def __eq__(self, other):
         return (
-            isinstance(other, BlockSummary) and
-            self.previous_block_hash == other.previous_block_hash and
-            self.merkle_root_hash == other.merkle_root_hash and
-            self.timestamp == other.timestamp and
-            self.target == other.target and
-            self.nonce == other.nonce
+            isinstance(other, BlockSummary)
+            and self.previous_block_hash == other.previous_block_hash
+            and self.merkle_root_hash == other.merkle_root_hash
+            and self.timestamp == other.timestamp
+            and self.target == other.target
+            and self.nonce == other.nonce
         )
 
     @classmethod
@@ -225,7 +229,9 @@ class BlockSummary(Serializable):
         target = safe_read(f, 32)
         (nonce,) = struct.unpack(b">I", safe_read(f, 4))
 
-        return cls(height, previous_block_hash, merkle_root_hash, timestamp, target, nonce)
+        return cls(
+            height, previous_block_hash, merkle_root_hash, timestamp, target, nonce
+        )
 
     def stream_serialize(self, f):
         stream_serialize_vlq(f, self.height)
@@ -240,7 +246,6 @@ class BlockSummary(Serializable):
 
 
 class BlockHeader(Serializable):
-
     def __init__(self, summary, pow_evidence):
         self.version = 0
         self.summary = summary
@@ -251,14 +256,14 @@ class BlockHeader(Serializable):
 
     def __eq__(self, other):
         return (
-            isinstance(other, BlockHeader) and
-            self.summary == other.summary and
-            self.pow_evidence == other.pow_evidence
+            isinstance(other, BlockHeader)
+            and self.summary == other.summary
+            and self.pow_evidence == other.pow_evidence
         )
 
     @classmethod
     def stream_deserialize(cls, f):
-        if safe_read(f, 1) != b'\x00':
+        if safe_read(f, 1) != b"\x00":
             raise ValueError("Current version only supports version 0 blocks")
 
         summary = BlockSummary.stream_deserialize(f)
@@ -283,10 +288,17 @@ class Block(Serializable):
 
     def __getattr__(self, attr):
         """convenience: merge header and summary's attributes into the Block's accessors"""
-        if attr in ['version', 'summary', 'pow_evidence', 'hash']:
+        if attr in ["version", "summary", "pow_evidence", "hash"]:
             return getattr(self.header, attr)
 
-        if attr in ['height', 'previous_block_hash', 'merkle_root_hash', 'timestamp', 'target', 'nonce']:
+        if attr in [
+            "height",
+            "previous_block_hash",
+            "merkle_root_hash",
+            "timestamp",
+            "target",
+            "nonce",
+        ]:
             return getattr(self.header.summary, attr)
 
         raise AttributeError("'Block' object has no attribute '%s'" % attr)
@@ -296,8 +308,9 @@ class Block(Serializable):
 
     def __eq__(self, other):
         return (
-            isinstance(other, Block) and
-            self.header == other.header and
+            isinstance(other, Block)
+            and self.header == other.header
+            and
             # for valid blocks comparing transactions is superfluous but we don't make that assumption here
             self.transactions == other.transactions
         )
@@ -317,12 +330,12 @@ class Block(Serializable):
 
 
 __all__ = [
-    'OutputReference',
-    'Input',
-    'Output',
-    'Transaction',
-    'PowEvidence',
-    'BlockSummary',
-    'BlockHeader',
-    'Block',
+    "OutputReference",
+    "Input",
+    "Output",
+    "Transaction",
+    "PowEvidence",
+    "BlockSummary",
+    "BlockHeader",
+    "Block",
 ]

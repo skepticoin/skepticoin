@@ -3,15 +3,14 @@ The general theme of these tests is: let's do some end-to-end tests, so we at le
 the most obvious of mistakes.
 """
 
-from time import time
 import logging
 import os
-from pathlib import Path
-from time import sleep
 import socket
+from pathlib import Path
+from time import sleep, time
 
-from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
+from skepticoin.datatypes import Block
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.networking.utils import load_peers_from_list
 
@@ -33,12 +32,12 @@ def _read_chain_from_disk(max_height):
 
     coinstate = CoinState.zero()
 
-    for filename in sorted(os.listdir('chain')):
+    for filename in sorted(os.listdir("chain")):
         height = int(filename.split("-")[0])
         if height > max_height:
             return coinstate
 
-        block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
+        block = Block.stream_deserialize(open(Path("chain") / filename, "rb"))
         coinstate = coinstate.add_block_no_validation(block)
 
     return coinstate
@@ -61,10 +60,12 @@ def test_ibd_integration(caplog):
     thread_a = NetworkingThread(coinstate, 12412, FakeDiskInterface())
     thread_a.start()
 
-    _try_to_connect('127.0.0.1', 12412)
+    _try_to_connect("127.0.0.1", 12412)
 
     thread_b = NetworkingThread(CoinState.zero(), 12413, FakeDiskInterface())
-    thread_b.local_peer.network_manager.disconnected_peers = load_peers_from_list([('127.0.0.1', 12412, "OUTGOING")])
+    thread_b.local_peer.network_manager.disconnected_peers = load_peers_from_list(
+        [("127.0.0.1", 12412, "OUTGOING")]
+    )
     thread_b.start()
 
     try:

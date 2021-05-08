@@ -20,19 +20,19 @@ def select_block_height(input_hash, current_height):
 
     # current_height is the height of the block which hash we're mining/verifying
 
-    base = int.from_bytes(input_hash[:8], byteorder='big', signed=False)
+    base = int.from_bytes(input_hash[:8], byteorder="big", signed=False)
     return base % current_height
 
 
 def select_block_slice(hash, serialized_block, length):
     # we interpret the next 4 bytes of the hash as a number, and then modulo block length. Support for up to 4GiB blocks
 
-    base = int.from_bytes(hash[8:12], byteorder='big', signed=False)
+    base = int.from_bytes(hash[8:12], byteorder="big", signed=False)
     start = base % len(serialized_block)
 
     result = b""
     while len(result) < length:
-        result += serialized_block[start:start + length - len(result)]
+        result += serialized_block[start : start + length - len(result)]
         start = 0
 
     return result
@@ -46,12 +46,16 @@ def select_slice_from_chain(input_hash, current_height, get_block_by_height, len
     return select_block_slice(input_hash, selected_block.serialize(), length)
 
 
-def select_n_k_length_slices_from_chain(starting_hash, current_height, get_block_by_height, n, k):
+def select_n_k_length_slices_from_chain(
+    starting_hash, current_height, get_block_by_height, n, k
+):
     result = []
 
     current_hash = starting_hash
     for i in range(n):
-        b = select_slice_from_chain(current_hash, current_height, get_block_by_height, k)
+        b = select_slice_from_chain(
+            current_hash, current_height, get_block_by_height, k
+        )
         result.append(b)
 
         if i != n - 1:

@@ -11,7 +11,8 @@ def load_peers_from_list(lst):
     from .peer import DisconnectedRemotePeer
 
     return {
-        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None) for (host, port, direction) in lst
+        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None)
+        for (host, port, direction) in lst
     }
 
 

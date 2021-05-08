@@ -1,5 +1,5 @@
-from .humans import human
 from .hash import sha256d
+from .humans import human
 
 
 def get_merkle_root(list_of_hashes):
@@ -30,7 +30,7 @@ class MerkleNode:
         if self.value is not None:
             return self.value
 
-        return sha256d(b''.join(c.hash() for c in self.children))
+        return sha256d(b"".join(c.hash() for c in self.children))
 
     def __repr__(self):
         return "M(%s, (%s))" % (human(self.hash())[:7], self.children)
@@ -51,7 +51,9 @@ def _get_merkle_tree(list_of_nodes):
 
 
 def get_merkle_tree(list_of_hashes):
-    return _get_merkle_tree([MerkleNode(i, (), h) for (i, h) in enumerate(list_of_hashes)])
+    return _get_merkle_tree(
+        [MerkleNode(i, (), h) for (i, h) in enumerate(list_of_hashes)]
+    )
 
 
 def get_proof(merkle_node, index_of_interest):
@@ -64,12 +66,14 @@ def get_proof(merkle_node, index_of_interest):
         reconstruct = lambda ot, rec: (ot, rec)  # noqa
     else:
         recurse_into, other = merkle_node.children
-        reconstruct = lambda ot, rec: (rec, ot) # noqa
+        reconstruct = lambda ot, rec: (rec, ot)  # noqa
 
     simplified_other = MerkleNode(other.index, (), other.hash())
     recursion_result = get_proof(recurse_into, index_of_interest)
 
-    return MerkleNode(merkle_node.index, reconstruct(simplified_other, recursion_result))
+    return MerkleNode(
+        merkle_node.index, reconstruct(simplified_other, recursion_result)
+    )
 
 
 def _chunks(lst, chunk_size):
@@ -78,4 +82,4 @@ def _chunks(lst, chunk_size):
     >>> list(chunks([0, 1, 2, 3, 4], 2))
     [[0, 1], [2, 3], [4]]
     """
-    return (lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size))
+    return (lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size))
