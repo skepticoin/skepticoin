@@ -44,6 +44,7 @@ def main():
 
     start_time = datetime.now()
     start_balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
+    balance = start_balance
     print("Wallet balance: %s skepticoin" % start_balance)
 
 
@@ -67,11 +68,10 @@ def main():
                     uptime = now - start_time
                     uptime_str = str(uptime).split(".")[0]
 
-                    balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
                     mined = balance - start_balance
                     mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
 
-                    print(f"{now_str} | uptime: {uptime_str} | {hashes:>2} hash/sec | mined: {mined:>3} SKE | {mine_speed:5.2f} SKE/h")
+                    print(f"{now_str} | uptime: {uptime_str} | {hashes:>2} hash/sec | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
                     last_round_second = int(time())
                     hashes = 0
 
@@ -89,7 +89,8 @@ def main():
             with open(Path('chain') / block_filename(block), 'wb') as f:
                 f.write(block.serialize())
             print("FOUND", block_filename(block))
-            print("Wallet balance: %s skepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
+            balance = (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN))
+            print("Wallet balance: %s skepticoin" % balance)
 
             thread.local_peer.chain_manager.set_coinstate(coinstate)
             thread.local_peer.network_manager.broadcast_block(block)
