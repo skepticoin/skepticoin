@@ -35,4 +35,4 @@ jobs:
         flake8 . --show-source --statistics
     - name: Test with pytest
       run: |
-        PYTHONPATH=. pytest --tb=native -k 'not integration'
+        PYTHONPATH=. pytest --tb=native

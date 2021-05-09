@@ -5,7 +5,6 @@ the most obvious of mistakes.
 
 from time import time
 import logging
-import os
 from pathlib import Path
 from time import sleep
 import socket
