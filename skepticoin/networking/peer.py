@@ -10,7 +10,7 @@ import traceback
 from datetime import datetime
 from io import BytesIO
 from ipaddress import IPv6Address
-from threading import Lock, LockType  # type: ignore
+from threading import Lock  # type: ignore
 from time import time
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -184,7 +184,7 @@ def inventory_batch_handled(peer: Peer) -> bool:
 class ChainManager(Manager):
     def __init__(self, local_peer: LocalPeer, current_time: int):
         self.local_peer = local_peer
-        self.lock: LockType = Lock()
+        self.lock = Lock()
         self.coinstate: Optional[CoinState] = None
         self.actively_fetching_blocks_from_peers: List[
             Tuple[int, ConnectedRemotePeer]
