@@ -8,6 +8,7 @@ from skepticoin.consensus import construct_block_for_mining
 from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import save_wallet
 from skepticoin.utils import block_filename
+from skepticoin.cheating import MAX_KNOWN_HASH_HEIGHT
 from time import time
 
 from .utils import (
@@ -36,6 +37,10 @@ def main():
 
     if check_for_fresh_chain(thread):
         thread.local_peer.show_stats()
+
+    if thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
+        print("Your blockchain is not just old, it is ancient; ABORTING")
+        return
 
     start_time = datetime.now()
     start_balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
