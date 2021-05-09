@@ -1,5 +1,6 @@
 from pathlib import Path
 from decimal import Decimal
+from datetime import datetime
 import random
 
 from skepticoin.params import SASHIMI_PER_COIN
@@ -36,6 +37,8 @@ def main():
     if check_for_fresh_chain(thread):
         thread.local_peer.show_stats()
 
+    start_time = datetime.now()
+    start_balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
     print("Starting mining: A repeat minter")
 
     try:
@@ -47,20 +50,29 @@ def main():
 
             nonce = random.randrange(1 << 32)
             last_round_second = int(time())
-            i = 0
+            hashes = 0
 
             while True:
                 if int(time()) > last_round_second:
-                    print("Hashrate:", i)
+                    now = datetime.now()
+                    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+                    uptime = now - start_time
+                    uptime_str = str(uptime).split(".")[0]
+
+                    balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
+                    mined = balance - start_balance
+                    mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
+
+                    print(f"{now_str} | uptime: {uptime_str} | {hashes:>2} hash/sec | mined: {mined:>3} SKE | {mine_speed:5.2f} SKE/h")
                     last_round_second = int(time())
-                    i = 0
+                    hashes = 0
 
                 coinstate, transactions = thread.local_peer.chain_manager.get_state()
                 increasing_time = max(int(time()), coinstate.head().timestamp + 1)
                 block = construct_block_for_mining(
                     coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
 
-                i += 1
+                hashes += 1
                 nonce = (nonce + 1) % (1 << 32)
                 if block.hash() < block.target:
                     break
