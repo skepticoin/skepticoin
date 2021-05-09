@@ -44,6 +44,9 @@ def main():
 
     start_time = datetime.now()
     start_balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
+    print("Wallet balance: %s skepticoin" % start_balance)
+
+
     print("Starting mining: A repeat minter")
 
     try:
