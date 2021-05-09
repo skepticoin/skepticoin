@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, List, Optional, TypeVar, Tuple
+from typing import List, Optional, TypeVar
 
 from skepticoin.hash import sha256d
 from skepticoin.humans import human
@@ -66,26 +66,30 @@ def get_proof(merkle_node: MerkleNode, index_of_interest: int) -> MerkleNode:
     if not merkle_node.children:
         return merkle_node
 
-    reconstruct: Callable[[MerkleNode, MerkleNode], List[MerkleNode]]
+    def swap(ot: MerkleNode, rec: MerkleNode) -> List[MerkleNode]:
+        return [rec, ot]
+
+    def no_swap(ot: MerkleNode, rec: MerkleNode) -> List[MerkleNode]:
+        return [ot, rec]
 
     # our nodes always have either 0 or 2 children, never 1
     if index_of_interest >= merkle_node.children[1].index:
         other, recurse_into = merkle_node.children
-        reconstruct = lambda ot, rec: [ot, rec]
+        reconstruct = no_swap
     else:
         recurse_into, other = merkle_node.children
-        reconstruct = lambda ot, rec: [rec, ot]
+        reconstruct = swap
 
     simplified_other = MerkleNode(other.index, [], other.hash())
     recursion_result = get_proof(recurse_into, index_of_interest)
-
-
 
     return MerkleNode(
         merkle_node.index, reconstruct(simplified_other, recursion_result)
     )
 
-T = TypeVar('T')
+
+T = TypeVar("T")
+
 
 def _chunks(lst: List[T], chunk_size: int) -> List[List[T]]:
     """return chunks of chunk_size for list lst

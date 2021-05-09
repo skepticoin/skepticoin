@@ -9,7 +9,10 @@ from pathlib import Path
 
 import immutables
 
-from .datatypes import OutputReference
+from skepticoin.coinstate import CoinState, PKBalance
+from skepticoin.signing import PublicKey
+
+from .datatypes import Block, Output, OutputReference, Transaction
 from .humans import human
 from .params import SASHIMI_PER_COIN
 
@@ -29,8 +32,11 @@ def show_coin(sashimi: float) -> str:
 
 
 def pkb2_apply_transaction(
-    unspent_transaction_outs, public_key_balances, transaction, is_coinbase
-):
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
+    public_key_balances: immutables.Map[PublicKey, PKBalance],
+    transaction: Transaction,
+    is_coinbase: bool,
+) -> immutables.Map[PublicKey, PKBalance]:
     with public_key_balances.mutate() as mutable_public_key_balances:
         # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
         if not is_coinbase:
@@ -92,7 +98,11 @@ def pkb2_apply_transaction(
         return mutable_public_key_balances.finish()
 
 
-def pkb2_apply_block(unspent_transaction_outs, public_key_balances, block):
+def pkb2_apply_block(
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
+    public_key_balances: immutables.Map[PublicKey, PKBalance],
+    block: Block,
+) -> immutables.Map[PublicKey, PKBalance]:
     public_key_balances = pkb2_apply_transaction(
         unspent_transaction_outs,
         public_key_balances,
@@ -108,13 +118,19 @@ def pkb2_apply_block(unspent_transaction_outs, public_key_balances, block):
     return public_key_balances
 
 
-def get_unspent_transaction_outs_before_block(coinstate, block):
+def get_unspent_transaction_outs_before_block(
+    coinstate: CoinState, block: Block
+) -> immutables.Map[OutputReference, Output]:
     if block.previous_block_hash == b"\00" * 32:
         return immutables.Map()
     return coinstate.unspent_transaction_outs_by_hash[block.previous_block_hash]
 
 
-def build_pkb2_block(coinstate, block, public_key_balances_2):
+def build_pkb2_block(
+    coinstate: CoinState,
+    block: Block,
+    public_key_balances_2: immutables.Map[PublicKey, PKBalance],
+) -> immutables.Map[PublicKey, PKBalance]:
     # TODO factor this away.
     unspent_transaction_outs = get_unspent_transaction_outs_before_block(
         coinstate, block
@@ -122,7 +138,7 @@ def build_pkb2_block(coinstate, block, public_key_balances_2):
     return pkb2_apply_block(unspent_transaction_outs, public_key_balances_2, block)
 
 
-def build_pkb2(coinstate):
+def build_pkb2(coinstate: CoinState) -> immutables.Map[PublicKey, PKBalance]:
     public_key_balances_2 = immutables.Map()
 
     for height in range(coinstate.head().height + 1):
@@ -134,7 +150,7 @@ def build_pkb2(coinstate):
     return public_key_balances_2
 
 
-def build_explorer(coinstate):
+def build_explorer(coinstate: CoinState) -> None:
     if not os.path.exists("explorer"):
         print("Created new directory for explorer")
         os.makedirs("explorer")

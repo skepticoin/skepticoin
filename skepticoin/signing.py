@@ -98,6 +98,9 @@ class Signature(Serializable):
         that may actually be used to verify public keys should return False here."""
         return True
 
+    def validate(self, public_key: Any, message: bytes) -> bool:
+        raise NotImplementedError
+
 
 class SignableEquivalent(Signature):
     """SignableEquivalent: when signing transactions you can't sign your own signature."""

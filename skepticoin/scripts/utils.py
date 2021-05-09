@@ -97,7 +97,9 @@ def open_or_init_wallet() -> Wallet:
     return wallet
 
 
-def start_networking_peer_in_background(args: Any, coinstate: CoinState) -> NetworkingThread:
+def start_networking_peer_in_background(
+    args: Any, coinstate: CoinState
+) -> NetworkingThread:
     print("Starting networking peer in background")
     port = None if args.dont_listen else args.listening_port
     thread = NetworkingThread(coinstate, port)

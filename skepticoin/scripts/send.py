@@ -1,6 +1,5 @@
 from time import sleep
 
-from skepticoin.coinstate import CoinState
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import (

@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import struct
 from io import BytesIO
-from typing import Any, BinaryIO, List
+from typing import Any, BinaryIO, List, Optional
 
 from skepticoin.hash import sha256d
 from skepticoin.humans import human
 from skepticoin.params import CHAIN_SAMPLE_TOTAL_SIZE
-from skepticoin.serialization import (Serializable, safe_read,
-                                      stream_deserialize_list,
-                                      stream_deserialize_vlq,
-                                      stream_serialize_list,
-                                      stream_serialize_vlq)
+from skepticoin.serialization import (
+    Serializable,
+    safe_read,
+    stream_deserialize_list,
+    stream_deserialize_vlq,
+    stream_serialize_list,
+    stream_serialize_vlq,
+)
 
-from .signing import (PublicKey, SECP256k1Signature, SignableEquivalent,
-                      Signature)
+from .signing import PublicKey, SignableEquivalent, Signature
 
 
 class OutputReference(Serializable):
@@ -59,7 +61,9 @@ class OutputReference(Serializable):
 class Input(Serializable):
     """Input of a transaction"""
 
-    def __init__(self, output_reference: OutputReference, signature: Signature):
+    def __init__(
+        self, output_reference: OutputReference, signature: Optional[Signature]
+    ):
         # bitcoin's sequence number (unused) is not reproduced here. See
         # https://bitcoin.stackexchange.com/questions/2025/what-is-txins-sequence
 
@@ -86,6 +90,7 @@ class Input(Serializable):
 
     def stream_serialize(self, f: BytesIO) -> None:
         self.output_reference.stream_serialize(f)
+        assert self.signature
         self.signature.stream_serialize(f)
 
     def signable_equivalent(self) -> Input:
@@ -190,7 +195,7 @@ class PowEvidence(Serializable):
         )
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> PowEvidence:
+    def stream_deserialize(cls, f: BinaryIO) -> PowEvidence:
         summary_hash = safe_read(f, 32)
         chain_sample = safe_read(f, CHAIN_SAMPLE_TOTAL_SIZE)
         block_hash = safe_read(f, 32)
@@ -207,8 +212,13 @@ class BlockSummary(Serializable):
     # akin to Bitcoin's BlockHeader. Our BlockHeader contains an PowEvidence also though, so we need an extra layer
 
     def __init__(
-        self, height: int, previous_block_hash: bytes, merkle_root_hash: bytes,
-        timestamp: int, target: bytes, nonce: int
+        self,
+        height: int,
+        previous_block_hash: bytes,
+        merkle_root_hash: bytes,
+        timestamp: int,
+        target: bytes,
+        nonce: int,
     ):
         # block height is included here to allow for partial validation of the POW in absence of the full block. (block
         # height is needed to calculate the blocks to sample from in chain_sample).
@@ -237,7 +247,7 @@ class BlockSummary(Serializable):
         )
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> BlockSummary:
+    def stream_deserialize(cls, f: BinaryIO) -> BlockSummary:
         height = stream_deserialize_vlq(f)
         previous_block_hash = safe_read(f, 32)
         merkle_root_hash = safe_read(f, 32)
@@ -278,7 +288,7 @@ class BlockHeader(Serializable):
         )
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> BlockHeader:
+    def stream_deserialize(cls, f: BinaryIO) -> BlockHeader:
         if safe_read(f, 1) != b"\x00":
             raise ValueError("Current version only supports version 0 blocks")
 

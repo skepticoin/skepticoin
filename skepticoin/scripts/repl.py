@@ -1,6 +1,5 @@
 import os
 
-from _typeshed import NoneType
 from ptpython.entry_points.run_ptpython import get_config_and_history_file
 from ptpython.repl import PythonRepl, embed, run_config
 
@@ -10,8 +9,7 @@ import skepticoin.networking.messages
 import skepticoin.signing
 from skepticoin.__version__ import __version__
 from skepticoin.params import SASHIMI_PER_COIN
-
-from .utils import (
+from skepticoin.scripts.utils import (
     DefaultArgumentParser,
     configure_logging_from_args,
     create_chain_dir,

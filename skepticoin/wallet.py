@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-from io import BytesIO, IOBase
-from typing import Dict, List, Text, TextIO
+from typing import Dict, List, Mapping, Set, TextIO
 
 import ecdsa
 
 from .coinstate import CoinState, PKBalance
-from .datatypes import Input, Output, Transaction
+from .datatypes import Input, Output, OutputReference, Transaction
 from .humans import computer, human
 from .signing import SECP256k1PublicKey, SECP256k1Signature
 
@@ -29,7 +28,9 @@ class Wallet:
         self.unused_public_keys = unused_public_keys
         self.public_key_annotations = public_key_annotations
 
-        self.spent_transaction_outputs = set()  # TODO save to disk too at some point.
+        self.spent_transaction_outputs: Set[
+            OutputReference
+        ] = set()  # TODO save to disk too at some point.
 
     def __repr__(self) -> str:
         return "Wallet w/ %s keypairs" % len(self.keypairs)
@@ -58,7 +59,7 @@ class Wallet:
         self.keypairs[public_key] = private_key
         self.unused_public_keys.append(public_key)
 
-    def generate_keys(self, n=100) -> None:
+    def generate_keys(self, n: int = 100) -> None:
         for _ in range(n):
             self.generate_key()
 
@@ -99,7 +100,11 @@ class Wallet:
         )
 
 
-def sign_transaction(wallet, unspent_transaction_outs, transaction):
+def sign_transaction(
+    wallet: Wallet,
+    unspent_transaction_outs: Mapping[OutputReference, Output],
+    transaction: Transaction,
+) -> Transaction:
     message = transaction.signable_equivalent().serialize()
 
     signed_inputs = []

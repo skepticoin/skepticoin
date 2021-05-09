@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import struct
 from io import BytesIO
-from typing import Any, List, Sequence, Type
+from typing import Any, BinaryIO, List, Sequence, Type
 
 
 class DeserializationError(Exception):
@@ -25,13 +27,17 @@ class Serializable:
     def deserialize(cls, bytes_: bytes) -> Any:
         f = BytesIO(bytes_)
         f.seek(0)
-        return cls.stream_deserialize(f)  # type: ignore
+        return cls.stream_deserialize(f)
 
     def stream_serialize(self, f: BytesIO) -> None:
         raise NotImplementedError
 
+    @classmethod
+    def stream_deserialize(cls, f: BytesIO) -> Serializable:
+        raise NotImplementedError
 
-def safe_read(f: BytesIO, n: int) -> bytes:
+
+def safe_read(f: BinaryIO, n: int) -> bytes:
     r: bytes = f.read(n)
 
     if len(r) < n:
@@ -48,7 +54,7 @@ def stream_serialize_list(f: BytesIO, lst: Sequence[Serializable]) -> None:
         elem.stream_serialize(f)
 
 
-def stream_deserialize_list(f: BytesIO, clz: Type) -> List[Any]:
+def stream_deserialize_list(f: BinaryIO, clz: Type) -> List[Any]:
     result: List[Type] = []
     length = stream_deserialize_vlq(f)
     for _ in range(length):
@@ -56,7 +62,7 @@ def stream_deserialize_list(f: BytesIO, clz: Type) -> List[Any]:
     return result
 
 
-def serialize_list(lst: List[Serializable]) -> bytes:
+def serialize_list(lst: Sequence[Serializable]) -> bytes:
     f = BytesIO()
     stream_serialize_list(f, lst)
     return f.getvalue()
@@ -87,7 +93,7 @@ def stream_serialize_vlq(f: BytesIO, i: int) -> None:
         mod = div
 
 
-def stream_deserialize_vlq(f: BytesIO) -> int:
+def stream_deserialize_vlq(f: BinaryIO) -> int:
     """ """
     result = 0
 
