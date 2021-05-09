@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import json
 import os
 from io import BytesIO, IOBase
-from typing import Dict, List
+from typing import Dict, List, Text, TextIO
 
 import ecdsa
 
@@ -60,7 +62,7 @@ class Wallet:
         for _ in range(n):
             self.generate_key()
 
-    def dump(self, f: IOBase) -> None:
+    def dump(self, f: TextIO) -> None:
         # The Simplest Thing That Could Possibly Work (though not the most secure)
         json.dump(
             {
@@ -76,7 +78,7 @@ class Wallet:
         )
 
     @classmethod
-    def load(cls, f: IOBase) -> None:
+    def load(cls, f: TextIO) -> Wallet:
         d = json.load(f)
 
         return cls(

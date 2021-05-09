@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from io import BytesIO
 import struct
-from typing import Any, List
+from io import BytesIO
+from typing import Any, BinaryIO, List
 
 from skepticoin.hash import sha256d
 from skepticoin.humans import human
 from skepticoin.params import CHAIN_SAMPLE_TOTAL_SIZE
-from skepticoin.serialization import (
-    Serializable,
-    safe_read,
-    stream_deserialize_list,
-    stream_deserialize_vlq,
-    stream_serialize_list,
-    stream_serialize_vlq,
-)
-from .signing import PublicKey, SECP256k1Signature, SignableEquivalent, Signature
+from skepticoin.serialization import (Serializable, safe_read,
+                                      stream_deserialize_list,
+                                      stream_deserialize_vlq,
+                                      stream_serialize_list,
+                                      stream_serialize_vlq)
+
+from .signing import (PublicKey, SECP256k1Signature, SignableEquivalent,
+                      Signature)
 
 
 class OutputReference(Serializable):
@@ -333,7 +332,7 @@ class Block(Serializable):
         )
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> Block:
+    def stream_deserialize(cls, f: BinaryIO) -> Block:
         header = BlockHeader.stream_deserialize(f)
         transactions = stream_deserialize_list(f, Transaction)
         return cls(header, transactions)

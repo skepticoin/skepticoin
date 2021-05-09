@@ -1,37 +1,23 @@
+from typing import List
+
 import immutables
 
 from .cheating import KNOWN_HASHES, MAX_KNOWN_HASH_HEIGHT
 from .coinstate import CoinState
-from .datatypes import (
-    Block,
-    BlockHeader,
-    BlockSummary,
-    Input,
-    Output,
-    OutputReference,
-    PowEvidence,
-    Transaction,
-)
+from .datatypes import (Block, BlockHeader, BlockSummary, Input, Output,
+                        OutputReference, PowEvidence, Transaction)
 from .hash import blake2, scrypt
 from .humans import computer, human
 from .merkletree import get_merkle_root
-from .params import (
-    BLOCKS_BETWEEN_TARGET_READJUSTMENT,
-    CHAIN_SAMPLE_COUNT,
-    CHAIN_SAMPLE_SIZE,
-    CHAIN_SAMPLE_TOTAL_SIZE,
-    DESIRED_TARGET_READJUSTMENT_TIMESPAN,
-    INITIAL_SUBSIDY,
-    INITIAL_TARGET,
-    MAX_BLOCK_SIZE,
-    MAX_COINBASE_RANDOM_DATA_SIZE,
-    MAX_FUTURE_BLOCK_TIME,
-    MAX_SASHIMI,
-    SUBSIDY_HALVING_INTERVAL,
-)
+from .params import (BLOCKS_BETWEEN_TARGET_READJUSTMENT, CHAIN_SAMPLE_COUNT,
+                     CHAIN_SAMPLE_SIZE, CHAIN_SAMPLE_TOTAL_SIZE,
+                     DESIRED_TARGET_READJUSTMENT_TIMESPAN, INITIAL_SUBSIDY,
+                     INITIAL_TARGET, MAX_BLOCK_SIZE,
+                     MAX_COINBASE_RANDOM_DATA_SIZE, MAX_FUTURE_BLOCK_TIME,
+                     MAX_SASHIMI, SUBSIDY_HALVING_INTERVAL)
 from .pow import select_n_k_length_slices_from_chain
 from .serialization import serialize_list
-from .signing import CoinbaseData
+from .signing import CoinbaseData, SECP256k1PublicKey
 
 # ## Section: Shared between Construction & Validation
 
@@ -216,12 +202,12 @@ def construct_block_for_mining_genesis(
 
 
 def construct_block_for_mining(
-    coinstate,
-    non_coinbase_transactions,
-    miner_public_key,
-    current_timestamp,
-    random_data,
-    nonce,
+    coinstate: CoinState,
+    non_coinbase_transactions: List[Transaction],
+    miner_public_key: SECP256k1PublicKey,
+    current_timestamp: int,
+    random_data: bytes,
+    nonce: int,
 ):
 
     previous_block = coinstate.head()
@@ -276,12 +262,12 @@ class ValidateBlockError(ValidationError):
     pass
 
 
-def validate_sashimi_range(value):
+def validate_sashimi_range(value: int) -> None:
     if not (0 < value <= MAX_SASHIMI):
         raise ValidationError("Value out of range.")
 
 
-def validate_non_coinbase_transaction_by_itself(transaction):
+def validate_non_coinbase_transaction_by_itself(transaction: Transaction) -> None:
     """Do those Transaction checks that can be done outside of the context a blockchain"""
 
     if len(transaction.inputs) == 0:
@@ -325,13 +311,13 @@ def validate_non_coinbase_transaction_by_itself(transaction):
             )
 
 
-def validate_signature_for_spend(input, previous_output, transaction):
+def validate_signature_for_spend(input: Input, previous_output: Output, transaction: Transaction) -> None:
     message = transaction.signable_equivalent().serialize()
     if not input.signature.validate(previous_output.public_key, message):
         raise ValidateTransactionError("Wrong signature for claimed output")
 
 
-def validate_coinbase_transaction_by_itself(transaction):
+def validate_coinbase_transaction_by_itself(transaction: Transaction) -> None:
     if not len(transaction.inputs) == 1:
         raise ValidateTransactionError(
             "Coinbase transaction should have precisely 1 input"
@@ -356,14 +342,14 @@ def validate_proof_of_work(hash, target):
         raise ValidatePOWError("hash >= target")
 
 
-def validate_block_header_by_itself(block_header, current_timestamp):
+def validate_block_header_by_itself(block_header: BlockHeader, current_timestamp: int) -> None:
     validate_proof_of_work(block_header.hash(), block_header.summary.target)
 
     if block_header.summary.timestamp > current_timestamp + MAX_FUTURE_BLOCK_TIME:
         raise ValidateBlockHeaderError("Block timestamp in the future")
 
 
-def validate_no_duplicate_transactions(transactions):
+def validate_no_duplicate_transactions(transactions: List[Transaction]) -> None:
     seen_transactions = set()
     for transaction in transactions:
         if transaction in seen_transactions:
@@ -371,7 +357,7 @@ def validate_no_duplicate_transactions(transactions):
         seen_transactions.add(transaction)
 
 
-def validate_no_duplicate_output_references_in_transactions(transactions):
+def validate_no_duplicate_output_references_in_transactions(transactions: List[Transaction]) -> None:
     seen_output_references = set()
     for transaction in transactions:
         for input in transaction.inputs:
@@ -380,7 +366,7 @@ def validate_no_duplicate_output_references_in_transactions(transactions):
             seen_output_references.add(input.output_reference)
 
 
-def validate_block_by_itself(block, current_timestamp):
+def validate_block_by_itself(block: Block, current_timestamp: int) -> None:
     validate_block_header_by_itself(block.header, current_timestamp)
 
     if len(block.transactions) == 0:
@@ -433,7 +419,7 @@ def validate_coinbase_transaction_in_coinstate(transaction, block, coinstate):
         raise ValidateTransactionError("Transaction overspending (Coinbase)")
 
 
-def validate_non_coinbase_transaction_in_coinstate(transaction, at_hash, coinstate):
+def validate_non_coinbase_transaction_in_coinstate(transaction: Transaction, at_hash: bytes, coinstate: CoinState) -> None:
     # Note that unspent_transaction_outs is fetched only once here, reflecting the state at the beginning of the block;
     # the implication is that spending money from another transaction in the same block is illegal. Though I'm sure
     # there are theoretical advantages in allowing it, the extra complexity isn't worth it. This also means we have to

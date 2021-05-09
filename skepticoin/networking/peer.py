@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import random
@@ -8,9 +10,9 @@ import traceback
 from datetime import datetime
 from io import BytesIO
 from ipaddress import IPv6Address
-from threading import Lock
+from threading import Lock, LockType  # type: ignore
 from time import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from skepticoin.__version__ import __version__
 from skepticoin.coinstate import CoinState
@@ -18,72 +20,52 @@ from skepticoin.consensus import (
     ValidateTransactionError,
     validate_no_duplicate_output_references_in_transactions,
     validate_non_coinbase_transaction_by_itself,
-    validate_non_coinbase_transaction_in_coinstate,
-)
-from skepticoin.datatypes import Transaction
+    validate_non_coinbase_transaction_in_coinstate)
+from skepticoin.datatypes import Block, Transaction
 from skepticoin.humans import human
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.utils import block_filename, calc_work
 
-from .messages import (
-    DATA_BLOCK,
-    DATA_TRANSACTION,
-    DataMessage,
-    GetBlocksMessage,
-    GetDataMessage,
-    GetPeersMessage,
-    HelloMessage,
-    InventoryItem,
-    InventoryMessage,
-    Message,
-    MessageHeader,
-    Peer,
-    PeersMessage,
-    SupportedVersion,
-)
-from .params import (
-    EMPTY_INVENTORY_BACKOFF,
-    GET_BLOCKS_INVENTORY_SIZE,
-    GET_PEERS_INTERVAL,
-    IBD_PEER_TIMEOUT,
-    MAX_IBD_PEERS,
-    MAX_MESSAGE_SIZE,
-    PORT,
-    SWITCH_TO_ACTIVE_MODE_TIMEOUT,
-    TIME_BETWEEN_CONNECTION_ATTEMPTS,
-)
+from .messages import (DATA_BLOCK, DATA_TRANSACTION, DataMessage,
+                       GetBlocksMessage, GetDataMessage, GetPeersMessage,
+                       HelloMessage, InventoryItem, InventoryMessage, Message,
+                       MessageHeader, Peer, PeersMessage, SupportedVersion)
+from .params import (EMPTY_INVENTORY_BACKOFF, GET_BLOCKS_INVENTORY_SIZE,
+                     GET_PEERS_INTERVAL, IBD_PEER_TIMEOUT, MAX_IBD_PEERS,
+                     MAX_MESSAGE_SIZE, PORT, SWITCH_TO_ACTIVE_MODE_TIMEOUT,
+                     TIME_BETWEEN_CONNECTION_ATTEMPTS)
 
 LISTENING_SOCKET = "LISTENING_SOCKET"
-IRRELEVANT = "IRRELEVANT"
+IRRELEVANT = -1
 MAGIC = b"MAJI"
 
 INCOMING = "INCOMING"
 OUTGOING = "OUTGOING"
 
 
-def _new_context():
+def _new_context() -> int:
     # just a random number will do; this is used for debugging only.
     return random.randrange(1 << 64)
 
 
 class Manager:
-    def step(self, current_time):
+    def step(self, current_time: int) -> None:
         raise NotImplementedError
 
 
 class NetworkManager(Manager):
-    def __init__(self, local_peer):
+    def __init__(self, local_peer: LocalPeer):
         self.local_peer = local_peer
-        self.my_addresses = set()
-        self.connected_peers = {}
-        self.disconnected_peers = {}
+        self.my_addresses: Set[Tuple[str, int]] = set()
+        self.connected_peers: Dict[Tuple[str, int, str], ConnectedRemotePeer] = {}
+        self.disconnected_peers: Dict[Tuple[str, int, str], DisconnectedRemotePeer] = {}
 
-    def _sanity_check(self):
+    def _sanity_check(self) -> None:
         for key in self.disconnected_peers:
             if key in self.connected_peers:
                 raise Exception("this shouldn't happen %s" % (key,))
 
-    def step(self, current_time):
+    def step(self, current_time: int) -> None:
         # self.local_peer.logger.info("NetworkManager.step()")
         self._sanity_check()
 
@@ -102,7 +84,7 @@ class NetworkManager(Manager):
         for peer in list(self.connected_peers.values()):
             peer.step(current_time)
 
-    def handle_peer_connected(self, remote_peer):
+    def handle_peer_connected(self, remote_peer: ConnectedRemotePeer) -> None:
         self.local_peer.logger.info(
             "%15s NetworkManager.handle_peer_connected()" % remote_peer.host
         )
@@ -122,7 +104,7 @@ class NetworkManager(Manager):
             del self.disconnected_peers[key]
         self._sanity_check()
 
-    def handle_peer_disconnected(self, remote_peer):
+    def handle_peer_disconnected(self, remote_peer: DisconnectedRemotePeer) -> None:
         self.local_peer.logger.info(
             "%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host
         )
@@ -135,14 +117,14 @@ class NetworkManager(Manager):
         del self.connected_peers[key]
         self._sanity_check()
 
-    def get_active_peers(self):
+    def get_active_peers(self) -> List[ConnectedRemotePeer]:
         return [
             p
             for p in self.connected_peers.values()
             if p.hello_sent and p.hello_received
         ]
 
-    def broadcast_block(self, block):
+    def broadcast_block(self, block: Block) -> None:
         self.local_peer.logger.info(
             "%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash()))
         )
@@ -159,7 +141,7 @@ class NetworkManager(Manager):
             ):  # seen in the wild for selector problems; should be more exactly matched tho
                 pass
 
-    def broadcast_transaction(self, transaction):
+    def broadcast_transaction(self, transaction: Transaction) -> None:
         message = DataMessage(DATA_TRANSACTION, transaction)
         for peer in self.get_active_peers():
             try:
@@ -174,21 +156,21 @@ class NetworkManager(Manager):
                 pass
 
 
-def inventory_batch_handled(peer):
+def inventory_batch_handled(peer: Peer) -> bool:
     """Has the full loop GetBlocks -> Inventory -> GetData (n times) -> Data (n times) been completed?"""
     return not peer.waiting_for_inventory and peer.inventory_messages == []
 
 
 class ChainManager(Manager):
-    def __init__(self, local_peer, current_time):
+    def __init__(self, local_peer: LocalPeer, current_time: int):
         self.local_peer = local_peer
-        self.lock = Lock()
+        self.lock: LockType = Lock()
         self.coinstate: Optional[CoinState] = None
-        self.actively_fetching_blocks_from_peers = []
+        self.actively_fetching_blocks_from_peers: List[Tuple[int, ConnectedRemotePeer]] = []
         self.started_at = current_time
         self.transaction_pool: List[Transaction] = []
 
-    def step(self, current_time):
+    def step(self, current_time: int) -> None:
         if not self.should_actively_fetch_blocks(current_time):
             return  # no manual action required, blocks expected to be sent to us instead.
 
@@ -226,7 +208,10 @@ class ChainManager(Manager):
         # timeout is only implemented half-baked: it currently only limits when an new GetBlocksMessage will be sent;
         # but doesn't take the timed-out peer out of the loop that it's already in. This is not necessarily a bad thing.
 
-    def should_actively_fetch_blocks(self, current_time):
+    def should_actively_fetch_blocks(self, current_time: int) -> bool:
+
+        assert self.coinstate
+
         return (
             (
                 current_time
@@ -240,7 +225,7 @@ class ChainManager(Manager):
             )  # on average, every 1 minutes, do a network resync explicitly
         )
 
-    def set_coinstate(self, coinstate):
+    def set_coinstate(self, coinstate: CoinState) -> None:
         with self.lock:
             self.local_peer.logger.info(
                 "%15s ChainManager.set_coinstate(%s)" % ("", coinstate)
@@ -248,7 +233,7 @@ class ChainManager(Manager):
             self.coinstate = coinstate
             self._cleanup_transaction_pool_for_coinstate(coinstate)
 
-    def add_transaction_to_pool(self, transaction):
+    def add_transaction_to_pool(self, transaction: Transaction) -> bool:
         with self.lock:
             self.local_peer.logger.info(
                 "%15s ChainManager.add_transaction_to_pool(%s)"
@@ -257,6 +242,9 @@ class ChainManager(Manager):
 
             try:
                 validate_non_coinbase_transaction_by_itself(transaction)
+
+                assert self.coinstate
+
                 validate_non_coinbase_transaction_in_coinstate(
                     transaction, self.coinstate.current_chain_hash, self.coinstate
                 )
@@ -287,13 +275,16 @@ class ChainManager(Manager):
 
     def get_state(self) -> Tuple[CoinState, List[Transaction]]:
         with self.lock:
+            assert self.coinstate
             return self.coinstate, self.transaction_pool
 
-    def _cleanup_transaction_pool_for_coinstate(self, coinstate):
+    def _cleanup_transaction_pool_for_coinstate(self, coinstate: CoinState) -> None:
         # This is really the simplest (though not most efficient mechanism): simply remove now-invalid transactions from
         # the pool
-        def is_valid(transaction):
+        def is_valid(transaction: Transaction) -> bool:
             try:
+                assert self.coinstate
+
                 # validate_non_coinbase_transaction_by_itself(transaction) Not needed, this never changes
                 validate_non_coinbase_transaction_in_coinstate(
                     transaction, self.coinstate.current_chain_hash, self.coinstate
@@ -307,7 +298,9 @@ class ChainManager(Manager):
 
         self.transaction_pool = [t for t in self.transaction_pool if is_valid(t)]
 
-    def get_get_blocks_message(self):
+    def get_get_blocks_message(self) -> GetBlocksMessage:
+        assert self.coinstate
+
         heights = get_recent_block_heights(self.coinstate.head().height)
         potential_start_hashes = [
             self.coinstate.by_height_at_head()[height].hash() for height in heights
@@ -316,7 +309,7 @@ class ChainManager(Manager):
 
 
 class RemotePeer:
-    def __init__(self, host, port, direction, last_connection_attempt):
+    def __init__(self, host: str, port: int, direction: str, last_connection_attempt: Optional[int]):
         self.host = host
         self.port = port
         self.direction = direction
@@ -325,18 +318,18 @@ class RemotePeer:
 
 
 class DisconnectedRemotePeer(RemotePeer):
-    def __init__(self, host, port, direction, last_connection_attempt):
+    def __init__(self, host: str, port: int, direction: str, last_connection_attempt: Optional[int]):
         super().__init__(host, port, direction, last_connection_attempt)
 
         # self.last_seen_alive = None
 
-    def is_time_to_connect(self, current_time):
+    def is_time_to_connect(self, current_time: int) -> bool:
         return (self.last_connection_attempt is None) or (
             current_time - self.last_connection_attempt
             >= TIME_BETWEEN_CONNECTION_ATTEMPTS
         )
 
-    def as_connected(self, local_peer, sock):
+    def as_connected(self, local_peer: LocalPeer, sock: socket.socket) -> ConnectedRemotePeer:
         return ConnectedRemotePeer(
             local_peer,
             self.host,
@@ -348,14 +341,14 @@ class DisconnectedRemotePeer(RemotePeer):
 
 
 class MessageReceiver:
-    def __init__(self, peer):
+    def __init__(self, peer: Peer):
         self.peer = peer
 
         self.buffer = b""
         self.magic_read = False
         self.len = None
 
-    def receive(self, data):
+    def receive(self, data: bytes) -> None:
         self.buffer += data
 
         if not self.magic_read and len(self.buffer) >= 4:
@@ -385,7 +378,7 @@ class MessageReceiver:
                 b""
             )  # recurse to repeat (multiple messages could be received in a single socket read)
 
-    def handle_message_data(self, message_data):
+    def handle_message_data(self, message_data: bytes) -> None:
         f = BytesIO(message_data)
         header = MessageHeader.stream_deserialize(f)
         message = Message.stream_deserialize(f)
@@ -393,7 +386,7 @@ class MessageReceiver:
 
 
 class InventoryMessageState:
-    def __init__(self, header, message):
+    def __init__(self, header: MessageHeader, message: InventoryMessage):
         self.header = header
         self.message = message
         self.index = 0
@@ -402,7 +395,7 @@ class InventoryMessageState:
 
 class ConnectedRemotePeer(RemotePeer):
     def __init__(
-        self, local_peer, host, port, direction, last_connection_attempt, sock
+        self, local_peer: LocalPeer, host: str, port: int, direction: str, last_connection_attempt: Optional[int], sock: socket.socket
     ):
         super().__init__(host, port, direction, last_connection_attempt)
         self.local_peer = local_peer
@@ -410,29 +403,29 @@ class ConnectedRemotePeer(RemotePeer):
         self.direction = direction
 
         self.receiver = MessageReceiver(self)
-        self.send_backlog = []
-        self.send_buffer = b""
+        self.send_backlog: List[bytes] = []
+        self.send_buffer: bytes = b""
 
-        self.hello_sent = False
-        self.hello_received = False
+        self.hello_sent: bool = False
+        self.hello_received: bool = False
 
-        self.sent = b""
-        self.received = b""
+        self.sent: bytes = b""
+        self.received: bytes = b""
 
-        self.waiting_for_inventory = False
-        self.last_empty_inventory_response_at = 0
-        self.inventory_messages = []
+        self.waiting_for_inventory: bool = False
+        self.last_empty_inventory_response_at: int = 0
+        self.inventory_messages: List[InventoryMessage] = []
 
-        self._next_msg_id = 0
-        self.last_get_peers_sent_at = None
-        self.waiting_for_peers = False
+        self._next_msg_id: int = 0
+        self.last_get_peers_sent_at: Optional[int] = None
+        self.waiting_for_peers: bool = False
 
-    def as_disconnected(self):
+    def as_disconnected(self) -> DisconnectedRemotePeer:
         return DisconnectedRemotePeer(
             self.host, self.port, self.direction, self.last_connection_attempt
         )
 
-    def step(self, current_time):
+    def step(self, current_time: int) -> None:
         """The responsibility of this method: to send the HelloMessage and GetPeersMessage."""
 
         if not self.hello_sent:
@@ -467,13 +460,13 @@ class ConnectedRemotePeer(RemotePeer):
             self.waiting_for_peers = True
             self.last_get_peers_sent_at = current_time
 
-    def _get_msg_id(self):
+    def _get_msg_id(self) -> int:
         self._next_msg_id += 1
         return (
             self._next_msg_id
         )  # 1 is the first message id (0 being reserved for "unknown"). Dijkstra's dead.
 
-    def send_message(self, message, prev_header=None):
+    def send_message(self, message: DataMessage, prev_header: Optional[MessageHeader]=None) -> None:
         if prev_header is None:
             in_response_to, context = 0, _new_context()
         else:
@@ -495,20 +488,20 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.check_message_backlog()
 
-    def check_message_backlog(self):
+    def check_message_backlog(self) -> None:
         if len(self.send_buffer) == 0 and len(self.send_backlog) > 0:
             self.send_buffer = self.send_backlog.pop(0)
             self.start_sending()
 
-    def start_sending(self):
+    def start_sending(self) -> None:
         self.local_peer.selector.modify(
             self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self
         )
 
-    def stop_sending(self):
+    def stop_sending(self) -> None:
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
 
-    def handle_message_received(self, header, message):
+    def handle_message_received(self, header: MessageHeader, message: Message) -> None:
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_message_received(%s %s)"
             % (self.host, type(message).__name__, header.format())
@@ -540,7 +533,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         raise NotImplementedError("%s" % message)
 
-    def handle_can_send(self, sock):
+    def handle_can_send(self, sock: socket.socket) -> None:
         self.local_peer.logger.info("ConnectedRemotePeer.handle_can_send()")
 
         sent = sock.send(self.send_buffer)
@@ -551,7 +544,7 @@ class ConnectedRemotePeer(RemotePeer):
             self.stop_sending()  # in principle: wasteful, but easy to reason about.
             self.check_message_backlog()
 
-    def handle_receive_data(self, data):
+    def handle_receive_data(self, data: bytes) -> None:
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_receive_data()" % self.host
         )
@@ -559,7 +552,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.receiver.receive(data)
 
-    def handle_hello_message_received(self, header, message):
+    def handle_hello_message_received(self, header: MessageHeader, message: HelloMessage) -> None:
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_hello_message_received(%s)"
             % (self.host, message.user_agent)
@@ -586,11 +579,12 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.local_peer.disk_interface.update_peer_db(self)
 
-    def handle_get_blocks_message_received(self, header, message):
+    def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host
         )
         coinstate = self.local_peer.chain_manager.coinstate
+        assert coinstate
         self.local_peer.logger.debug(
             "%15s ... at coinstate %s" % (self.host, coinstate)
         )
@@ -632,7 +626,7 @@ class ConnectedRemotePeer(RemotePeer):
         )
         self.send_message(InventoryMessage(items), prev_header=header)
 
-    def handle_inventory_message_received(self, header, message):
+    def handle_inventory_message_received(self, header: MessageHeader, message: InventoryMessage) -> None:
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_inventory_message_received(%s)"
             % (self.host, len(message.items))
@@ -665,7 +659,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.inventory_messages.append(InventoryMessageState(header, message))
         self.check_inventory_messages()
 
-    def _get_hash_from_inventory_messages(self):
+    def _get_hash_from_inventory_messages(self) -> Tuple[Optional[InventoryMessage], Optional[bytes]]:
         while self.inventory_messages:
             msg_state = self.inventory_messages[0]
 
@@ -673,7 +667,7 @@ class ConnectedRemotePeer(RemotePeer):
                 if msg_state.message.items[msg_state.index].data_type != DATA_BLOCK:
                     raise Exception("We only deal w/ Block InventoryMessage for now")
 
-                result = msg_state.message.items[msg_state.index].hash
+                result: bytes = msg_state.message.items[msg_state.index].hash
                 msg_state.index += 1
                 return msg_state, result
 
@@ -695,8 +689,9 @@ class ConnectedRemotePeer(RemotePeer):
 
         return None, None
 
-    def check_inventory_messages(self):
+    def check_inventory_messages(self) -> None:
         coinstate = self.local_peer.chain_manager.coinstate
+        assert coinstate
 
         msg_state, next_hash = self._get_hash_from_inventory_messages()
         while next_hash is not None and next_hash in coinstate.block_by_hash:
@@ -705,18 +700,21 @@ class ConnectedRemotePeer(RemotePeer):
         if next_hash is None or next_hash in coinstate.block_by_hash:
             return
 
+        assert msg_state
         msg_state.actually_used = True
         self.send_message(
             GetDataMessage(DATA_BLOCK, next_hash), prev_header=msg_state.header
         )
 
-    def handle_get_data_message_received(self, header, get_data_message):
+    def handle_get_data_message_received(self, header: MessageHeader, get_data_message: GetDataMessage) -> None:
         if get_data_message.data_type != DATA_BLOCK:
             raise NotImplementedError(
                 "We can only deal w/ DATA_BLOCK GetDataMessage objects for now"
             )
 
         coinstate = self.local_peer.chain_manager.coinstate
+        assert coinstate
+
         if get_data_message.hash not in coinstate.block_by_hash:
             # we simply silently ignore GetDataMessage for hashes we don't have... future work: inc banscore, or ...
             self.local_peer.logger.debug(
@@ -739,7 +737,7 @@ class ConnectedRemotePeer(RemotePeer):
         )
         self.send_message(data_message, prev_header=header)
 
-    def handle_data_message_received(self, header, message):
+    def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_data_message_received(%s %s)"
             % (self.host, message.data_type, header.format())
@@ -753,11 +751,12 @@ class ConnectedRemotePeer(RemotePeer):
 
         raise NotImplementedError("Unknown DataMessage objects for now")
 
-    def handle_block_received(self, header, message):
+    def handle_block_received(self, header: MessageHeader, message: DataMessage) -> None:
         # TODO deal with out-of-order blocks more gracefully
 
         block = message.data
         coinstate = self.local_peer.chain_manager.coinstate
+        assert coinstate
 
         if block.hash() in coinstate.block_by_hash:
             # implicit here: when you receive a datamessage, this could be because you requested it; and thus you'll
@@ -795,7 +794,7 @@ class ConnectedRemotePeer(RemotePeer):
             # chain's new head, and only the latter is relevant to the rest of the world.
             self.local_peer.network_manager.broadcast_block(block)
 
-    def handle_transaction_received(self, header, message):
+    def handle_transaction_received(self, header: MessageHeader, message: DataMessage) -> None:
         transaction = message.data
         if transaction in self.local_peer.chain_manager.transaction_pool:
             return
@@ -805,19 +804,19 @@ class ConnectedRemotePeer(RemotePeer):
             # at least peers will stop broadcasting once they receive it a second time themselves.
             self.local_peer.network_manager.broadcast_transaction(transaction)
 
-    def handle_get_peers_message_received(self, header, message):
-        peers = []
+    def handle_get_peers_message_received(self, header: MessageHeader, message: PeersMessage) -> None:
+        peers: List[Peer] = []
 
-        for peer in self.local_peer.network_manager.connected_peers.values():
-            if peer.direction == OUTGOING:
+        for connected_peer in self.local_peer.network_manager.connected_peers.values():
+            if connected_peer.direction == OUTGOING:
                 peers.append(
-                    Peer(int(time()), IPv6Address("::FFFF:%s" % peer.host), peer.port)
+                    Peer(int(time()), IPv6Address("::FFFF:%s" % connected_peer.host), connected_peer.port)
                 )
 
-        for peer in self.local_peer.network_manager.disconnected_peers.values():
-            if peer.direction == OUTGOING:
+        for disconnected_peer in self.local_peer.network_manager.disconnected_peers.values():
+            if disconnected_peer.direction == OUTGOING:
                 peers.append(
-                    Peer(0, IPv6Address("::FFFF:%s" % peer.host), peer.port)
+                    Peer(0, IPv6Address("::FFFF:%s" % disconnected_peer.host), disconnected_peer.port)
                 )  # TODO 'last seen' time.
 
         # TODO filter out local network addresses (also on the receiving end)
@@ -825,7 +824,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.send_message(PeersMessage(peers), prev_header=header)
 
-    def handle_peers_message_received(self, header, message):
+    def handle_peers_message_received(self, header: MessageHeader, message: PeersMessage) -> None:
         # TODO peers that have been communicated to you like this should be marked as "not checked yet" somehow, to
         # avoid being flooded with nonsense peers.
 
@@ -851,11 +850,11 @@ class ConnectedRemotePeer(RemotePeer):
 class DiskInterface:
     """Catch-all for writing to and reading from disk, factored out to facilitate testing."""
 
-    def save_block(self, block):
+    def save_block(self, block: Block) -> None:
         with open("chain/%s" % block_filename(block), "wb") as f:
             f.write(block.serialize())
 
-    def update_peer_db(self, remote_peer):
+    def update_peer_db(self, remote_peer: RemotePeer) -> None:
         if remote_peer.direction != OUTGOING:
             return
 
@@ -869,15 +868,15 @@ class DiskInterface:
         with open("peers.json", "w") as f:
             json.dump(db, f, indent=4)
 
-    def save_transaction_for_debugging(self, transaction):
+    def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), "wb") as f:
             f.write(transaction.serialize())
 
 
 class LocalPeer:
-    def __init__(self, disk_interface=DiskInterface()):
+    def __init__(self, disk_interface: DiskInterface=DiskInterface()):
         self.disk_interface = disk_interface
-        self.port = None  # perhaps just push this into the signature here?
+        self.port: Optional[int] = None  # TODO perhaps just push this into the signature here?
         self.nonce = random.randrange(pow(2, 32))
         self.selector = selectors.DefaultSelector()
         self.network_manager = NetworkManager(self)
@@ -889,7 +888,7 @@ class LocalPeer:
 
         self.logger = logging.getLogger("skepticoin.networking.%s" % self.nonce)
 
-    def start_listening(self, port=PORT):
+    def start_listening(self, port: int=PORT) -> None:
         self.port = port
         self.logger.info("%15s LocalPeer.start_listening(%s)" % ("", port))
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -902,7 +901,7 @@ class LocalPeer:
         lsock.setblocking(False)
         self.selector.register(lsock, selectors.EVENT_READ, data=LISTENING_SOCKET)
 
-    def handle_incoming_connection(self, sock):
+    def handle_incoming_connection(self, sock: socket.socket) -> None:
         self.logger.info("%15s LocalPeer.handle_incoming_connection()" % "")
         # TODO only accept a single (incoming, outgoing) connection from each peer
         conn, addr = sock.accept()
@@ -917,10 +916,10 @@ class LocalPeer:
         self.selector.register(conn, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
 
-    def handle_remote_peer_selector_event(self, key, mask):
+    def handle_remote_peer_selector_event(self, key: selectors.SelectorKey, mask: int) -> None:
         # self.logger.info("LocalPeer.handle_remote_peer_selector_event()")
 
-        sock = key.fileobj
+        sock: socket.socket = key.fileobj  # type: ignore
         remote_peer = key.data
         assert isinstance(remote_peer, ConnectedRemotePeer)
 
@@ -964,7 +963,7 @@ class LocalPeer:
 
             self.disconnect(remote_peer, "Exception")
 
-    def disconnect(self, remote_peer, reason=""):
+    def disconnect(self, remote_peer: ConnectedRemotePeer, reason: str="") -> None:
         self.logger.info("%15s LocalPeer.disconnect(%s)" % (remote_peer.host, reason))
 
         try:
@@ -978,7 +977,7 @@ class LocalPeer:
             # as a consequence of something that was read.
             self.logger.info("%15s Error while disconnecting %s" % ("", e))
 
-    def start_outgoing_connection(self, disconnected_peer):
+    def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
         self.logger.info(
             "%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host
         )
@@ -994,14 +993,14 @@ class LocalPeer:
         self.selector.register(sock, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
 
-    def step_managers(self, current_time):
+    def step_managers(self, current_time: int) -> None:
         for manager in self.managers:
             if not self.running:
                 break
 
             manager.step(current_time)
 
-    def handle_selector_events(self):
+    def handle_selector_events(self) -> None:
         events = self.selector.select(
             timeout=1
         )  # TODO this is for the managers to do something... tune it though
@@ -1010,11 +1009,11 @@ class LocalPeer:
                 break
 
             if key.data is LISTENING_SOCKET:
-                self.handle_incoming_connection(key.fileobj)
+                self.handle_incoming_connection(key.fileobj)  # type: ignore
             else:
                 self.handle_remote_peer_selector_event(key, mask)
 
-    def run(self):
+    def run(self) -> None:
         self.running = True
         try:
             while self.running:
@@ -1029,12 +1028,13 @@ class LocalPeer:
             self.selector.close()
             self.logger.info("%15s LocalPeer selector closed" % "")
 
-    def stop(self):
+    def stop(self) -> None:
         self.logger.info("%15s LocalPeer.stop()" % "")
         self.running = False
 
-    def show_stats(self):
+    def show_stats(self) -> None:
         coinstate = self.chain_manager.coinstate
+        assert coinstate
 
         print("NETWORK")
         print("Nr. of connected peers:", len(self.network_manager.get_active_peers()))
@@ -1055,7 +1055,7 @@ class LocalPeer:
                 print("diverges for %s blocks" % (head.height - lca.height))
             print()
 
-    def show_network_stats(self):
+    def show_network_stats(self) -> None:
         print("NETWORK")
         print("Nr. of connected peers:", len(self.network_manager.get_active_peers()))
         print(
@@ -1089,13 +1089,15 @@ class LocalPeer:
         for host, (incoming, outgoing) in per_host.items():
             print("%15s: %2d incoming, %2d outgoing" % (host, incoming, outgoing))
 
-    def show_chain_stats(self):
+    def show_chain_stats(self) -> None:
         coinstate = self.chain_manager.coinstate
+        assert coinstate
 
-        def get_block_timespan_factor(n):
+        def get_block_timespan_factor(n: int) -> float:
             # Current block duration over past n block as a factor of DESIRED_BLOCK_TIMESPAN, e.g. 0.5 for twice desired
             # speed
-            diff = (
+            assert coinstate
+            diff: int = (
                 coinstate.head().timestamp
                 - coinstate.at_head.block_by_height[
                     coinstate.head().height - n
@@ -1103,7 +1105,8 @@ class LocalPeer:
             )
             return diff / (DESIRED_BLOCK_TIMESPAN * n)
 
-        def get_network_hash_rate(n):
+        def get_network_hash_rate(n: int) -> float:
+            assert coinstate
             total_over_blocks = sum(
                 calc_work(
                     coinstate.at_head.block_by_height[
@@ -1113,7 +1116,7 @@ class LocalPeer:
                 for i in range(n)
             )
 
-            diff = (
+            diff: int = (
                 coinstate.head().timestamp
                 - coinstate.at_head.block_by_height[
                     coinstate.head().height - n

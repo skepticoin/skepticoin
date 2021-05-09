@@ -97,7 +97,7 @@ def open_or_init_wallet() -> Wallet:
     return wallet
 
 
-def start_networking_peer_in_background(args, coinstate: CoinState):
+def start_networking_peer_in_background(args: Any, coinstate: CoinState) -> NetworkingThread:
     print("Starting networking peer in background")
     port = None if args.dont_listen else args.listening_port
     thread = NetworkingThread(coinstate, port)
@@ -121,7 +121,7 @@ def configure_logging_for_stdout() -> None:
     logging.basicConfig(format=FORMAT, stream=sys.stdout, level=logging.INFO)
 
 
-def configure_logging_from_args(args) -> None:
+def configure_logging_from_args(args: Any) -> None:
     if args.log_to_file:
         configure_logging_for_file()
 

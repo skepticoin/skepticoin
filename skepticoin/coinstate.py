@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Mapping
+from typing import List, Mapping, Tuple
 
 import immutables
 
@@ -103,10 +103,10 @@ def pkb_apply_block(unspent_transaction_outs, public_key_balances, block):
 class CoinState:
     def __init__(
         self,
-        block_by_hash: Mapping[bytes, Block],
+        block_by_hash,
         unspent_transaction_outs_by_hash,
         block_by_height_by_hash: Mapping[bytes, Mapping[int, Block]],
-        heads,
+        heads: Mapping[bytes, Block],
         current_chain_hash,
         public_key_balances_by_hash,
     ):
@@ -146,7 +146,7 @@ class CoinState:
         )
 
     @classmethod
-    def zero(cls):
+    def zero(cls) -> CoinState:
         e = cls.empty()
         return e.add_block_no_validation(Block.deserialize(genesis_block_data))
 
@@ -161,7 +161,7 @@ class CoinState:
 
         return self.add_block_no_validation(block)
 
-    def add_block_no_validation(self, block: Block) -> None:
+    def add_block_no_validation(self, block: Block) -> CoinState:
         if block.previous_block_hash == b"\00" * 32:
             unspent_transaction_outs = immutables.Map()
             public_key_balances = immutables.Map()
@@ -240,10 +240,10 @@ class CoinState:
             public_key_balances_by_hash=public_key_balances_by_hash,
         )
 
-    def head(self):
+    def head(self) -> Block:
         return self.block_by_hash[self.current_chain_hash]
 
-    def by_height_at_head(self):
+    def by_height_at_head(self) -> Mapping[int, Block]:
         # TODO just use 'at_head'
         return self.block_by_height_by_hash[self.current_chain_hash]
 
@@ -264,8 +264,8 @@ class CoinState:
 
         return AtHead()
 
-    def forks(self):
-        def _find_lca_with_main(block):
+    def forks(self) -> List[Tuple[Block, Block]]:
+        def _find_lca_with_main(block: Block) -> Block:
             # while block.hash() not in block_by_hash_by_hash  ... we have no such datastructure yet, so instead:
 
             while (
