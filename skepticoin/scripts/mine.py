@@ -47,7 +47,6 @@ def main():
     balance = start_balance
     print("Wallet balance: %s skepticoin" % start_balance)
 
-
     print("Starting mining: A repeat minter")
 
     try:
@@ -71,7 +70,8 @@ def main():
                     mined = balance - start_balance
                     mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
 
-                    print(f"{now_str} | uptime: {uptime_str} | {hashes:>2} hash/sec | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
+                    print(f"{now_str} | uptime: {uptime_str} | {hashes:>2} hash/sec" +
+                          f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
                     last_round_second = int(time())
                     hashes = 0
 
