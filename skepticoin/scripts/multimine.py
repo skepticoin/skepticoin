@@ -166,7 +166,7 @@ def main(args):
                     if r[0] == 'hashrate':
                         hashrates[i] = r[1]
                     elif r[0] == 'found':
-                        found_blocks.append((r[1], datetime.fromtimestamp(r[2])))
+                        found_blocks.append((r[1], datetime.fromtimestamp(r[2]), i))
                         current_coins = max(current_coins, r[3])
                         height = int(r[1].split('-')[0])
                         chain_height = max(chain_height, height)
@@ -207,7 +207,7 @@ def main(args):
         screen.addstr(f'\n\nBlocks Found - {len(found_blocks): >4d}\n-------------------\n\n')
 
         for i in found_blocks[-1:-11:-1]:
-            screen.addstr(f'{i[1]} {i[0]}\n')
+            screen.addstr(f'{i[2]} {i[1]} {i[0]}\n')
 
         avg = 0
         if len(found_blocks) > 0:
@@ -250,8 +250,6 @@ def main(args):
                 wallet_lock.acquire()
                 curses.endwin()
                 exit(0)
-
-                last_button_press_time = time.time()
         else:
             curses.flushinp()
             curses.napms(250)
@@ -264,4 +262,5 @@ if __name__ == '__main__':
     _parser.add_argument('-n', default=1, type=int, help='number of miner instances')
 
     _args = _parser.parse_args()
+    _args.dont_listen = True
     main(_args)
