@@ -123,6 +123,7 @@ If you have ethical objections against this, you can always go to the
 ##
 
 **Q:** Is this some kind of get rich quick scheme?
+
 **A:** If you're asking you're probably looking for one. If you're buying skepticoin in the hope that some greater fool
        will buy them from you at a higher price, just know that, on average, it's likely that you're the greatest fool.
 
