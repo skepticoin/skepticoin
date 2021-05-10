@@ -16,6 +16,7 @@ from skepticoin.networking.utils import load_peers_from_list
 
 CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("../testdata/chain")
 
+
 class FakeDiskInterface:
     def save_block(self, block):
         pass
