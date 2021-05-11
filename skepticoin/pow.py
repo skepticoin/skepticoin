@@ -11,10 +11,10 @@ we can observe the trick. Here we deviate from that approach somewhat, for the f
   last.
 """
 
-from typing import Callable
+from .datatypes import Block
+from .hash import sha256d
 
-from skepticoin.hash import sha256d
-from skepticoin.serialization import Serializable
+from typing import Callable
 
 
 def select_block_height(input_hash: bytes, current_height: int) -> int:
@@ -44,7 +44,7 @@ def select_block_slice(hash: bytes, serialized_block: bytes, length: int) -> byt
 def select_slice_from_chain(
     input_hash: bytes,
     current_height: int,
-    get_block_by_height: Callable[..., Serializable],
+    get_block_by_height: Callable[[int], Block],
     length: int,
 ) -> bytes:
     selected_block_height = select_block_height(input_hash, current_height)
@@ -57,7 +57,7 @@ def select_slice_from_chain(
 def select_n_k_length_slices_from_chain(
     starting_hash: bytes,
     current_height: int,
-    get_block_by_height: Callable[..., Serializable],
+    get_block_by_height: Callable[[int], Block],
     n: int,
     k: int,
 ) -> bytes:
