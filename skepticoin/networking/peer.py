@@ -17,7 +17,7 @@ import socket
 import selectors
 import logging
 
-from .params import DESIRED_BLOCK_TIMESPAN
+from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.humans import human
 from skepticoin.consensus import (
     validate_no_duplicate_output_references_in_transactions,
