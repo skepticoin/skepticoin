@@ -8,8 +8,6 @@ import immutables
 from collections import namedtuple
 from pathlib import Path
 
-import immutables
-
 from skepticoin.coinstate import CoinState, PKBalance
 from skepticoin.signing import PublicKey
 

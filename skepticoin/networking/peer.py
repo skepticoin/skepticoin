@@ -9,21 +9,17 @@ from threading import Lock  # type: ignore
 from time import time
 from typing import Dict, List, Optional, Set, Tuple
 
-from skepticoin.__version__ import __version__
 from skepticoin.coinstate import CoinState
 import random
-from time import time
-from threading import Lock
 
 import struct
 import socket
 import selectors
 import logging
 
-from skepticoin.params import DESIRED_BLOCK_TIMESPAN
-from ..utils import calc_work
-from ..humans import human
-from ..consensus import (
+from .params import DESIRED_BLOCK_TIMESPAN
+from skepticoin.humans import human
+from skepticoin.consensus import (
     validate_no_duplicate_output_references_in_transactions,
     validate_non_coinbase_transaction_by_itself,
     validate_non_coinbase_transaction_in_coinstate,
@@ -41,8 +37,6 @@ from .params import (
     EMPTY_INVENTORY_BACKOFF,
 )
 from skepticoin.datatypes import Block, Transaction
-from skepticoin.humans import human
-from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.utils import block_filename, calc_work
 
 from .messages import (
@@ -61,13 +55,11 @@ from .messages import (
     InventoryMessage,
     InventoryItem,
 )
-from .utils import get_recent_block_heights
-from ..utils import block_filename
-from ..__version__ import __version__
+from skepticoin.__version__ import __version__
 
 
 LISTENING_SOCKET = "LISTENING_SOCKET"
-IRRELEVANT = "IRRELEVANT"
+IRRELEVANT = "IRRELEVANT"  # TODO don't use a string for a port number
 MAGIC = b'MAJI'
 
 INCOMING = "INCOMING"
@@ -424,7 +416,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         if not self.hello_sent:
             ipv4_mapped = IPv6Address("::FFFF:%s" % self.host)
-            port_if_known = self.port if self.port is not IRRELEVANT else 0
+            port_if_known = self.port if self.port is not IRRELEVANT else 0  # type: ignore
 
             my_ip_address = IPv6Address("0::0")  # Unspecified
             my_port = self.local_peer.port if self.local_peer.port else 0
@@ -556,6 +548,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
         for potential_start_hash in message.potential_start_hashes:
             self.local_peer.logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
+            assert coinstate
             if potential_start_hash in coinstate.block_by_hash:
                 start_height = coinstate.block_by_hash[potential_start_hash].height + 1  # + 1: sent hash is last known
                 if start_height not in coinstate.by_height_at_head():
@@ -569,7 +562,7 @@ class ConnectedRemotePeer(RemotePeer):
                     break
         else:  # no break
             start_height = 1  # genesis is last known
-
+        assert coinstate
         max_height = coinstate.head().height + 1  # + 1: range is exclusive, but we need to send this last block also
         items = [
             InventoryItem(DATA_BLOCK, coinstate.by_height_at_head()[height].hash())
@@ -735,6 +728,7 @@ class ConnectedRemotePeer(RemotePeer):
     ) -> None:
         peers: List[Peer] = []
 
+        peer: Peer
         for peer in self.local_peer.network_manager.connected_peers.values():
             if peer.direction == OUTGOING:
                 peers.append(Peer(int(time()), IPv6Address("::FFFF:%s" % peer.host), peer.port))
@@ -952,7 +946,7 @@ class LocalPeer:
         print("NETWORK")
         print("Nr. of connected peers:", len(self.network_manager.get_active_peers()))
         for p in self.network_manager.get_active_peers()[:10]:
-            print("%15s:%s - %s" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction))
+            print("%15s:%s - %s" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction))  # type: ignore
 
         print("\nCHAIN")
         for (head, lca) in coinstate.forks():
@@ -997,7 +991,7 @@ class LocalPeer:
             # speed
             assert coinstate
             diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
-            return diff / (DESIRED_BLOCK_TIMESPAN * n)
+            return diff / (DESIRED_BLOCK_TIMESPAN * n)  # type: ignore
 
         def get_network_hash_rate(n: int) -> float:
             assert coinstate
@@ -1006,7 +1000,7 @@ class LocalPeer:
 
             diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
 
-            return total_over_blocks / diff
+            return total_over_blocks / diff  # type: ignore
 
         print("WASTELAND STATS")
         print("Current target: ", human(coinstate.head().target))

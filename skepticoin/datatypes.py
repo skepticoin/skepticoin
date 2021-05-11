@@ -4,13 +4,6 @@ import struct
 from io import BytesIO
 from typing import Any, BinaryIO, List, Optional
 
-from skepticoin.hash import sha256d
-from skepticoin.humans import human
-from skepticoin.params import CHAIN_SAMPLE_TOTAL_SIZE
-from skepticoin.serialization import (
-    Serializable,
-)
-
 from .humans import human
 from .serialization import (
     safe_read,
@@ -33,7 +26,7 @@ class OutputReference(Serializable):
             raise ValueError('OutputReference hash must be 32 bytes.')
 
         if not (0 <= index <= 0xffffffff):
-            raise ValueError('OutputReference index out of range.' % index)
+            raise ValueError('OutputReference index %d is out of range.' % index)
 
         self.hash = hash
         self.index = index
@@ -80,7 +73,11 @@ class Input(Serializable):
         return "Input(%s, %s)" % (self.output_reference, self.signature)
 
     def __eq__(self, other: object) -> bool:
-        return self.output_reference == other.output_reference and self.signature == other.signature
+        return (
+            isinstance(other, Input) and
+            self.output_reference == other.output_reference and
+            self.signature == other.signature
+        )
 
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> Input:

@@ -2,39 +2,6 @@ from typing import List, Mapping
 
 import immutables
 
-from skepticoin.hash import blake2, scrypt
-from skepticoin.humans import computer, human
-from skepticoin.merkletree import get_merkle_root
-from skepticoin.params import (
-    BLOCKS_BETWEEN_TARGET_READJUSTMENT,
-    CHAIN_SAMPLE_COUNT,
-    CHAIN_SAMPLE_SIZE,
-    CHAIN_SAMPLE_TOTAL_SIZE,
-    DESIRED_TARGET_READJUSTMENT_TIMESPAN,
-    INITIAL_SUBSIDY,
-    INITIAL_TARGET,
-    MAX_BLOCK_SIZE,
-    MAX_COINBASE_RANDOM_DATA_SIZE,
-    MAX_FUTURE_BLOCK_TIME,
-    MAX_SASHIMI,
-    SUBSIDY_HALVING_INTERVAL,
-)
-
-from .cheating import KNOWN_HASHES, MAX_KNOWN_HASH_HEIGHT
-from .coinstate import CoinState
-from .datatypes import (
-    Block,
-    BlockHeader,
-    BlockSummary,
-    Input,
-    Output,
-    OutputReference,
-    PowEvidence,
-    Transaction,
-)
-from .pow import select_n_k_length_slices_from_chain
-from .serialization import serialize_list
-from .signing import CoinbaseData, SECP256k1PublicKey
 from .humans import human, computer
 from .params import (
     MAX_SASHIMI, MAX_BLOCK_SIZE, MAX_FUTURE_BLOCK_TIME, MAX_COINBASE_RANDOM_DATA_SIZE,
@@ -42,7 +9,7 @@ from .params import (
     CHAIN_SAMPLE_TOTAL_SIZE, CHAIN_SAMPLE_COUNT, CHAIN_SAMPLE_SIZE, INITIAL_TARGET
 )
 from .serialization import serialize_list
-from .signing import CoinbaseData
+from .signing import CoinbaseData, SECP256k1PublicKey
 from .merkletree import get_merkle_root
 from .datatypes import OutputReference, Input, Output, Transaction, BlockSummary, PowEvidence, BlockHeader, Block
 from .hash import scrypt, blake2
@@ -75,7 +42,11 @@ def calc_target(
 # ## Section: Construction of new Blocks
 
 
-def construct_minable_summary_genesis(transactions: List[Transaction], current_timestamp: int, nonce: int) -> BlockSummary:
+def construct_minable_summary_genesis(
+    transactions: List[Transaction],
+    current_timestamp: int,
+    nonce: int
+) -> BlockSummary:
     return BlockSummary(
         height=0,
         previous_block_hash=b'\x00' * 32,

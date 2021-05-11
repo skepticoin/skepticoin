@@ -3,10 +3,7 @@ from __future__ import annotations
 from .humans import human
 from .hash import sha256d
 
-from typing import List, Optional, TypeVar
-
-from skepticoin.hash import sha256d
-from skepticoin.humans import human
+from typing import Generator, List, Optional, Tuple, TypeVar, Union
 
 
 def get_merkle_root(list_of_hashes: List[bytes]) -> bytes:
@@ -25,7 +22,7 @@ def get_merkle_root(list_of_hashes: List[bytes]) -> bytes:
 
 class MerkleNode:
     def __init__(
-        self, index: int, children: List[MerkleNode], value: Optional[bytes] = None
+        self, index: int, children: Union[Tuple[()], Tuple[MerkleNode, MerkleNode]], value: Optional[bytes] = None
     ):
         # for non-leaves index is a lower-bound of all leaves' indexes
         self.index = index
@@ -52,7 +49,7 @@ def _get_merkle_tree(list_of_nodes: List[MerkleNode]) -> MerkleNode:
     new_list = []
     for chunk in _chunks(list_of_nodes, 2):
         if len(chunk) == 2:
-            new_list.append(MerkleNode(chunk[0].index, [chunk[0], chunk[1]]))
+            new_list.append(MerkleNode(chunk[0].index, (chunk[0], chunk[1])))
         else:  # implied: len(chunk) == 1
             new_list.append(chunk[0])
 
@@ -75,16 +72,16 @@ def get_proof(merkle_node: MerkleNode, index_of_interest: int) -> MerkleNode:
         recurse_into, other = merkle_node.children
         reconstruct = lambda ot, rec: (rec, ot) # noqa
 
-    simplified_other = MerkleNode(other.index, [], other.hash())
+    simplified_other = MerkleNode(other.index, (), other.hash())
     recursion_result = get_proof(recurse_into, index_of_interest)
 
-    return MerkleNode(merkle_node.index, reconstruct(simplified_other, recursion_result))
+    return MerkleNode(merkle_node.index, reconstruct(simplified_other, recursion_result))  # type: ignore
 
 
 T = TypeVar("T")
 
 
-def _chunks(lst: List[T], chunk_size: int) -> List[List[T]]:
+def _chunks(lst: List[T], chunk_size: int) -> Generator[List[T], None, None]:
     """return chunks of chunk_size for list lst
 
     >>> list(chunks([0, 1, 2, 3, 4], 2))

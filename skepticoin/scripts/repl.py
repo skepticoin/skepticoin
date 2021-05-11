@@ -9,17 +9,15 @@ import skepticoin.signing
 import skepticoin.humans
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.scripts.utils import (
-    DefaultArgumentParser,
     configure_logging_from_args,
-    create_chain_dir,
     initialize_peers_file,
     create_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
-    configure_logging_from_args,
     DefaultArgumentParser,
 )
+from .version import __version__
 
 
 class EverythingIsNone:

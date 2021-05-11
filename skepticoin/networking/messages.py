@@ -15,7 +15,6 @@ from skepticoin.serialization import (
     stream_serialize_list,
     stream_serialize_vlq,
 )
-from ..datatypes import Block, BlockHeader, Transaction
 
 
 MSG_HELLO = b'\x00\x00'

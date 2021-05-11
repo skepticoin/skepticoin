@@ -15,8 +15,6 @@ from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.networking.utils import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 
-from time import time, sleep
-
 
 class DefaultArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any):

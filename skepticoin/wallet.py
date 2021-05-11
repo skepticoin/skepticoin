@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from typing import Dict, List, Mapping, Set, TextIO
 
@@ -8,11 +7,9 @@ import ecdsa
 import json
 
 from .coinstate import CoinState, PKBalance
-from .datatypes import Input, Output, OutputReference, Transaction
 from .humans import computer, human
 from .signing import SECP256k1PublicKey, SECP256k1Signature
-from .datatypes import Input, Transaction, Output
-from .coinstate import PKBalance
+from .datatypes import Input, Transaction, Output, OutputReference
 
 
 class AddressParseError(Exception):

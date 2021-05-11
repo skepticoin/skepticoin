@@ -4,19 +4,9 @@ from collections import namedtuple
 from typing import Any, List, Optional, Tuple
 
 import immutables
-from collections import namedtuple
 
-from skepticoin.datatypes import (
-    Block,
-    BlockSummary,
-    Output,
-    OutputReference,
-    Transaction,
-)
-from skepticoin.genesis import genesis_block_data
-from skepticoin.humans import human
-from skepticoin.signing import PublicKey
-from .datatypes import OutputReference, Block
+from .signing import PublicKey
+from .datatypes import OutputReference, Block, Output, BlockSummary, Transaction
 from .humans import human
 from .genesis import genesis_block_data
 
