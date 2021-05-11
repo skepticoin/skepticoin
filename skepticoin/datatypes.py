@@ -9,6 +9,8 @@ from skepticoin.humans import human
 from skepticoin.params import CHAIN_SAMPLE_TOTAL_SIZE
 from skepticoin.serialization import (
     Serializable,
+)
+
 from .humans import human
 from .serialization import (
     safe_read,

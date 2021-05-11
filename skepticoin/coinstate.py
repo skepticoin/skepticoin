@@ -1,15 +1,11 @@
-<<<<<<< HEAD
 from __future__ import annotations
 
 from collections import namedtuple
 from typing import Any, List, Optional, Tuple
 
-=======
->>>>>>> parent of acb1901... Fix: format all files
 import immutables
 from collections import namedtuple
 
-<<<<<<< HEAD
 from skepticoin.datatypes import (
     Block,
     BlockSummary,
@@ -20,11 +16,9 @@ from skepticoin.datatypes import (
 from skepticoin.genesis import genesis_block_data
 from skepticoin.humans import human
 from skepticoin.signing import PublicKey
-=======
 from .datatypes import OutputReference, Block
 from .humans import human
 from .genesis import genesis_block_data
->>>>>>> parent of acb1901... Fix: format all files
 
 
 PKBalance = namedtuple('PKBalance', ['value', 'output_references'])
@@ -51,43 +45,26 @@ def uto_apply_transaction(
         return mutable_unspent_transaction_outs.finish()
 
 
-<<<<<<< HEAD
 def uto_apply_block(
     unspent_transaction_outs: immutables.Map[OutputReference, Output], block: Block
 ) -> immutables.Map[OutputReference, Output]:
-    unspent_transaction_outs = uto_apply_transaction(
-        unspent_transaction_outs, block.transactions[0], is_coinbase=True
-    )
-=======
-def uto_apply_block(unspent_transaction_outs, block):
     unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, block.transactions[0], is_coinbase=True)
->>>>>>> parent of acb1901... Fix: format all files
     for transaction in block.transactions[1:]:
         unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, transaction, is_coinbase=False)
     return unspent_transaction_outs
 
 
-<<<<<<< HEAD
 def pkb_apply_transaction(
     unspent_transaction_outs: immutables.Map[OutputReference, OutputReference],
     public_key_balances: immutables.Map[PublicKey, PKBalance],
     transaction: Transaction,
     is_coinbase: bool,
 ) -> immutables.Map[PublicKey, PKBalance]:
-=======
-def pkb_apply_transaction(unspent_transaction_outs, public_key_balances, transaction, is_coinbase):
->>>>>>> parent of acb1901... Fix: format all files
     with public_key_balances.mutate() as mutable_public_key_balances:
         # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
         if not is_coinbase:
             for input in transaction.inputs:
-<<<<<<< HEAD
-                previously_unspent_output: Output = unspent_transaction_outs[
-                    input.output_reference
-                ]
-=======
                 previously_unspent_output = unspent_transaction_outs[input.output_reference]
->>>>>>> parent of acb1901... Fix: format all files
 
                 public_key = previously_unspent_output.public_key
                 mutable_public_key_balances[public_key] = PKBalance(
@@ -128,7 +105,6 @@ def pkb_apply_block(
 
 
 class CoinState:
-<<<<<<< HEAD
     def __init__(
         self,
         block_by_hash: immutables.Map[bytes, BlockSummary],
@@ -142,10 +118,6 @@ class CoinState:
             bytes, immutables.Map[PublicKey, PKBalance]
         ],
     ):
-=======
-    def __init__(self, block_by_hash, unspent_transaction_outs_by_hash, block_by_height_by_hash, heads,
-                 current_chain_hash, public_key_balances_by_hash):
->>>>>>> parent of acb1901... Fix: format all files
 
         self.block_by_hash = block_by_hash
 
@@ -183,29 +155,15 @@ class CoinState:
         e = cls.empty()
         return e.add_block_no_validation(Block.deserialize(genesis_block_data))
 
-<<<<<<< HEAD
     def add_block(self, block: Block, current_timestamp: int) -> CoinState:
-        from skepticoin.consensus import (
-            validate_block_by_itself,
-            validate_block_in_coinstate,
-        )
-
-=======
-    def add_block(self, block, current_timestamp):
         from skepticoin.consensus import validate_block_by_itself, validate_block_in_coinstate
->>>>>>> parent of acb1901... Fix: format all files
         validate_block_by_itself(block, current_timestamp)
         validate_block_in_coinstate(block, self)
 
         return self.add_block_no_validation(block)
 
-<<<<<<< HEAD
     def add_block_no_validation(self, block: Block) -> CoinState:
-        if block.previous_block_hash == b"\00" * 32:
-=======
-    def add_block_no_validation(self, block):
         if block.previous_block_hash == b'\00' * 32:
->>>>>>> parent of acb1901... Fix: format all files
             unspent_transaction_outs = immutables.Map()
             public_key_balances = immutables.Map()
         else:
@@ -271,12 +229,7 @@ class CoinState:
         return self.block_by_height_by_hash[self.current_chain_hash]
 
     @property
-<<<<<<< HEAD
     def at_head(self) -> Any:  # TODO refactor, mypy doesn't like property classes
-=======
-    def at_head(self):
-
->>>>>>> parent of acb1901... Fix: format all files
         class AtHead:
             @property
             def unspent_transaction_outs(

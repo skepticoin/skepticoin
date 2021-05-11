@@ -1,30 +1,16 @@
-<<<<<<< HEAD
 from __future__ import annotations
 
-import json
-import logging
-import random
-import selectors
-import socket
-import struct
-import traceback
-=======
->>>>>>> parent of acb1901... Fix: format all files
 from datetime import datetime
 import traceback
 from io import BytesIO
 import json
 from ipaddress import IPv6Address
-<<<<<<< HEAD
 from threading import Lock  # type: ignore
 from time import time
 from typing import Dict, List, Optional, Set, Tuple
 
 from skepticoin.__version__ import __version__
 from skepticoin.coinstate import CoinState
-from skepticoin.consensus import (
-    ValidateTransactionError,
-=======
 import random
 from time import time
 from threading import Lock
@@ -38,7 +24,6 @@ from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from ..utils import calc_work
 from ..humans import human
 from ..consensus import (
->>>>>>> parent of acb1901... Fix: format all files
     validate_no_duplicate_output_references_in_transactions,
     validate_non_coinbase_transaction_by_itself,
     validate_non_coinbase_transaction_in_coinstate,
@@ -55,14 +40,11 @@ from .params import (
     SWITCH_TO_ACTIVE_MODE_TIMEOUT,
     EMPTY_INVENTORY_BACKOFF,
 )
-<<<<<<< HEAD
 from skepticoin.datatypes import Block, Transaction
 from skepticoin.humans import human
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.utils import block_filename, calc_work
 
-=======
->>>>>>> parent of acb1901... Fix: format all files
 from .messages import (
     SupportedVersion,
     MessageHeader,
@@ -79,12 +61,6 @@ from .messages import (
     InventoryMessage,
     InventoryItem,
 )
-<<<<<<< HEAD
-
-LISTENING_SOCKET = "LISTENING_SOCKET"
-IRRELEVANT = -1
-MAGIC = b"MAJI"
-=======
 from .utils import get_recent_block_heights
 from ..utils import block_filename
 from ..__version__ import __version__
@@ -93,7 +69,6 @@ from ..__version__ import __version__
 LISTENING_SOCKET = "LISTENING_SOCKET"
 IRRELEVANT = "IRRELEVANT"
 MAGIC = b'MAJI'
->>>>>>> parent of acb1901... Fix: format all files
 
 INCOMING = "INCOMING"
 OUTGOING = "OUTGOING"
@@ -110,12 +85,8 @@ class Manager:
 
 
 class NetworkManager(Manager):
-<<<<<<< HEAD
-    def __init__(self, local_peer: LocalPeer):
-=======
 
-    def __init__(self, local_peer):
->>>>>>> parent of acb1901... Fix: format all files
+    def __init__(self, local_peer: LocalPeer):
         self.local_peer = local_peer
         self.my_addresses: Set[Tuple[str, int]] = set()
         self.connected_peers: Dict[Tuple[str, int, str], ConnectedRemotePeer] = {}
@@ -142,15 +113,8 @@ class NetworkManager(Manager):
         for peer in list(self.connected_peers.values()):
             peer.step(current_time)
 
-<<<<<<< HEAD
     def handle_peer_connected(self, remote_peer: ConnectedRemotePeer) -> None:
-        self.local_peer.logger.info(
-            "%15s NetworkManager.handle_peer_connected()" % remote_peer.host
-        )
-=======
-    def handle_peer_connected(self, remote_peer):
         self.local_peer.logger.info("%15s NetworkManager.handle_peer_connected()" % remote_peer.host)
->>>>>>> parent of acb1901... Fix: format all files
 
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
         if key in self.connected_peers:
@@ -163,15 +127,8 @@ class NetworkManager(Manager):
             del self.disconnected_peers[key]
         self._sanity_check()
 
-<<<<<<< HEAD
     def handle_peer_disconnected(self, remote_peer: DisconnectedRemotePeer) -> None:
-        self.local_peer.logger.info(
-            "%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host
-        )
-=======
-    def handle_peer_disconnected(self, remote_peer):
         self.local_peer.logger.info("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
->>>>>>> parent of acb1901... Fix: format all files
 
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
 
@@ -181,25 +138,11 @@ class NetworkManager(Manager):
         del self.connected_peers[key]
         self._sanity_check()
 
-<<<<<<< HEAD
     def get_active_peers(self) -> List[ConnectedRemotePeer]:
-        return [
-            p
-            for p in self.connected_peers.values()
-            if p.hello_sent and p.hello_received
-        ]
-
-    def broadcast_block(self, block: Block) -> None:
-        self.local_peer.logger.info(
-            "%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash()))
-        )
-=======
-    def get_active_peers(self):
         return [p for p in self.connected_peers.values() if p.hello_sent and p.hello_received]
 
-    def broadcast_block(self, block):
+    def broadcast_block(self, block: Block) -> None:
         self.local_peer.logger.info("%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash())))
->>>>>>> parent of acb1901... Fix: format all files
         message = DataMessage(DATA_BLOCK, block)
         for peer in self.get_active_peers():
             try:
@@ -228,12 +171,8 @@ def inventory_batch_handled(peer: Peer) -> bool:
 
 
 class ChainManager(Manager):
-<<<<<<< HEAD
-    def __init__(self, local_peer: LocalPeer, current_time: int):
-=======
 
-    def __init__(self, local_peer, current_time):
->>>>>>> parent of acb1901... Fix: format all files
+    def __init__(self, local_peer: LocalPeer, current_time: int):
         self.local_peer = local_peer
         self.lock = Lock()
         self.coinstate: Optional[CoinState] = None
@@ -385,32 +324,12 @@ class DisconnectedRemotePeer(RemotePeer):
 
         # self.last_seen_alive = None
 
-<<<<<<< HEAD
     def is_time_to_connect(self, current_time: int) -> bool:
-        return (self.last_connection_attempt is None) or (
-            current_time - self.last_connection_attempt
-            >= TIME_BETWEEN_CONNECTION_ATTEMPTS
-        )
-
-    def as_connected(
-        self, local_peer: LocalPeer, sock: socket.socket
-    ) -> ConnectedRemotePeer:
-        return ConnectedRemotePeer(
-            local_peer,
-            self.host,
-            self.port,
-            self.direction,
-            self.last_connection_attempt,
-            sock,
-        )
-=======
-    def is_time_to_connect(self, current_time):
         return ((self.last_connection_attempt is None) or
                 (current_time - self.last_connection_attempt >= TIME_BETWEEN_CONNECTION_ATTEMPTS))
 
-    def as_connected(self, local_peer, sock):
+    def as_connected(self, local_peer: LocalPeer, sock: socket.socket) -> ConnectedRemotePeer:
         return ConnectedRemotePeer(local_peer, self.host, self.port, self.direction, self.last_connection_attempt, sock)
->>>>>>> parent of acb1901... Fix: format all files
 
 
 class MessageReceiver:
@@ -465,7 +384,6 @@ class InventoryMessageState:
 
 
 class ConnectedRemotePeer(RemotePeer):
-<<<<<<< HEAD
     def __init__(
         self,
         local_peer: LocalPeer,
@@ -475,33 +393,20 @@ class ConnectedRemotePeer(RemotePeer):
         last_connection_attempt: Optional[int],
         sock: socket.socket,
     ):
-=======
-    def __init__(self, local_peer, host, port, direction, last_connection_attempt, sock):
->>>>>>> parent of acb1901... Fix: format all files
         super().__init__(host, port, direction, last_connection_attempt)
         self.local_peer = local_peer
         self.sock = sock
         self.direction = direction
 
         self.receiver = MessageReceiver(self)
-<<<<<<< HEAD
         self.send_backlog: List[bytes] = []
         self.send_buffer: bytes = b""
-=======
-        self.send_backlog = []
-        self.send_buffer = b''
->>>>>>> parent of acb1901... Fix: format all files
 
         self.hello_sent: bool = False
         self.hello_received: bool = False
 
-<<<<<<< HEAD
         self.sent: bytes = b""
         self.received: bytes = b""
-=======
-        self.sent = b''
-        self.received = b''
->>>>>>> parent of acb1901... Fix: format all files
 
         self.waiting_for_inventory: bool = False
         self.last_empty_inventory_response_at: int = 0
@@ -511,15 +416,8 @@ class ConnectedRemotePeer(RemotePeer):
         self.last_get_peers_sent_at: Optional[int] = None
         self.waiting_for_peers: bool = False
 
-<<<<<<< HEAD
     def as_disconnected(self) -> DisconnectedRemotePeer:
-        return DisconnectedRemotePeer(
-            self.host, self.port, self.direction, self.last_connection_attempt
-        )
-=======
-    def as_disconnected(self):
         return DisconnectedRemotePeer(self.host, self.port, self.direction, self.last_connection_attempt)
->>>>>>> parent of acb1901... Fix: format all files
 
     def step(self, current_time: int) -> None:
         """The responsibility of this method: to send the HelloMessage and GetPeersMessage."""
@@ -574,30 +472,15 @@ class ConnectedRemotePeer(RemotePeer):
             self.send_buffer = self.send_backlog.pop(0)
             self.start_sending()
 
-<<<<<<< HEAD
     def start_sending(self) -> None:
-        self.local_peer.selector.modify(
-            self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self
-        )
-=======
-    def start_sending(self):
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
->>>>>>> parent of acb1901... Fix: format all files
 
     def stop_sending(self) -> None:
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
 
-<<<<<<< HEAD
     def handle_message_received(self, header: MessageHeader, message: Message) -> None:
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_message_received(%s %s)"
-            % (self.host, type(message).__name__, header.format())
-        )
-=======
-    def handle_message_received(self, header, message):
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_message_received(%s %s)" % (
             self.host, type(message).__name__, header.format()))
->>>>>>> parent of acb1901... Fix: format all files
 
         if isinstance(message, HelloMessage):
             return self.handle_hello_message_received(header, message)
@@ -636,15 +519,8 @@ class ConnectedRemotePeer(RemotePeer):
             self.stop_sending()  # in principle: wasteful, but easy to reason about.
             self.check_message_backlog()
 
-<<<<<<< HEAD
     def handle_receive_data(self, data: bytes) -> None:
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_receive_data()" % self.host
-        )
-=======
-    def handle_receive_data(self, data):
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data()" % self.host)
->>>>>>> parent of acb1901... Fix: format all files
         self.received += data
 
         self.receiver.receive(data)
@@ -674,24 +550,10 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.local_peer.disk_interface.update_peer_db(self)
 
-<<<<<<< HEAD
-    def handle_get_blocks_message_received(
-        self, header: MessageHeader, message: GetBlocksMessage
-    ) -> None:
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host
-        )
-        coinstate = self.local_peer.chain_manager.coinstate
-        assert coinstate
-        self.local_peer.logger.debug(
-            "%15s ... at coinstate %s" % (self.host, coinstate)
-        )
-=======
-    def handle_get_blocks_message_received(self, header, message):
+    def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
         coinstate = self.local_peer.chain_manager.coinstate
         self.local_peer.logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
->>>>>>> parent of acb1901... Fix: format all files
         for potential_start_hash in message.potential_start_hashes:
             self.local_peer.logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
             if potential_start_hash in coinstate.block_by_hash:
@@ -803,19 +665,9 @@ class ConnectedRemotePeer(RemotePeer):
             self.host, human(get_data_message.hash), coinstate.block_by_hash[get_data_message.hash].height))
         self.send_message(data_message, prev_header=header)
 
-<<<<<<< HEAD
-    def handle_data_message_received(
-        self, header: MessageHeader, message: DataMessage
-    ) -> None:
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_data_message_received(%s %s)"
-            % (self.host, message.data_type, header.format())
-        )
-=======
-    def handle_data_message_received(self, header, message):
+    def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_data_message_received(%s %s)" % (
             self.host, message.data_type, header.format()))
->>>>>>> parent of acb1901... Fix: format all files
 
         if message.data_type == DATA_BLOCK:
             return self.handle_block_received(header, message)
@@ -883,29 +735,6 @@ class ConnectedRemotePeer(RemotePeer):
     ) -> None:
         peers: List[Peer] = []
 
-<<<<<<< HEAD
-        for connected_peer in self.local_peer.network_manager.connected_peers.values():
-            if connected_peer.direction == OUTGOING:
-                peers.append(
-                    Peer(
-                        int(time()),
-                        IPv6Address("::FFFF:%s" % connected_peer.host),
-                        connected_peer.port,
-                    )
-                )
-
-        for (
-            disconnected_peer
-        ) in self.local_peer.network_manager.disconnected_peers.values():
-            if disconnected_peer.direction == OUTGOING:
-                peers.append(
-                    Peer(
-                        0,
-                        IPv6Address("::FFFF:%s" % disconnected_peer.host),
-                        disconnected_peer.port,
-                    )
-                )  # TODO 'last seen' time.
-=======
         for peer in self.local_peer.network_manager.connected_peers.values():
             if peer.direction == OUTGOING:
                 peers.append(Peer(int(time()), IPv6Address("::FFFF:%s" % peer.host), peer.port))
@@ -913,7 +742,6 @@ class ConnectedRemotePeer(RemotePeer):
         for peer in self.local_peer.network_manager.disconnected_peers.values():
             if peer.direction == OUTGOING:
                 peers.append(Peer(0, IPv6Address("::FFFF:%s" % peer.host), peer.port))  # TODO 'last seen' time.
->>>>>>> parent of acb1901... Fix: format all files
 
         # TODO filter out local network addresses (also on the receiving end)
         peers = peers[:1000]  # send 1000 peers max.
@@ -946,13 +774,8 @@ class ConnectedRemotePeer(RemotePeer):
 class DiskInterface:
     """Catch-all for writing to and reading from disk, factored out to facilitate testing."""
 
-<<<<<<< HEAD
     def save_block(self, block: Block) -> None:
-        with open("chain/%s" % block_filename(block), "wb") as f:
-=======
-    def save_block(self, block):
         with open('chain/%s' % block_filename(block), 'wb') as f:
->>>>>>> parent of acb1901... Fix: format all files
             f.write(block.serialize())
 
     def update_peer_db(self, remote_peer: RemotePeer) -> None:
@@ -969,23 +792,14 @@ class DiskInterface:
         with open("peers.json", "w") as f:
             json.dump(db, f, indent=4)
 
-<<<<<<< HEAD
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
-        with open("/tmp/%s.transaction" % human(transaction.hash()), "wb") as f:
-=======
-    def save_transaction_for_debugging(self, transaction):
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
->>>>>>> parent of acb1901... Fix: format all files
             f.write(transaction.serialize())
 
 
 class LocalPeer:
-<<<<<<< HEAD
-    def __init__(self, disk_interface: DiskInterface = DiskInterface()):
-=======
 
-    def __init__(self, disk_interface=DiskInterface()):
->>>>>>> parent of acb1901... Fix: format all files
+    def __init__(self, disk_interface: DiskInterface = DiskInterface()):
         self.disk_interface = disk_interface
         self.port: Optional[
             int
@@ -1080,17 +894,8 @@ class LocalPeer:
             # as a consequence of something that was read.
             self.logger.info("%15s Error while disconnecting %s" % ("", e))
 
-<<<<<<< HEAD
-    def start_outgoing_connection(
-        self, disconnected_peer: DisconnectedRemotePeer
-    ) -> None:
-        self.logger.info(
-            "%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host
-        )
-=======
-    def start_outgoing_connection(self, disconnected_peer):
+    def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
         self.logger.info("%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host)
->>>>>>> parent of acb1901... Fix: format all files
 
         server_addr = (disconnected_peer.host, disconnected_peer.port)
 
@@ -1110,15 +915,8 @@ class LocalPeer:
 
             manager.step(current_time)
 
-<<<<<<< HEAD
     def handle_selector_events(self) -> None:
-        events = self.selector.select(
-            timeout=1
-        )  # TODO this is for the managers to do something... tune it though
-=======
-    def handle_selector_events(self):
         events = self.selector.select(timeout=1)  # TODO this is for the managers to do something... tune it though
->>>>>>> parent of acb1901... Fix: format all files
         for key, mask in events:
             if not self.running:
                 break
@@ -1197,42 +995,16 @@ class LocalPeer:
         def get_block_timespan_factor(n: int) -> float:
             # Current block duration over past n block as a factor of DESIRED_BLOCK_TIMESPAN, e.g. 0.5 for twice desired
             # speed
-<<<<<<< HEAD
             assert coinstate
-            diff: int = (
-                coinstate.head().timestamp
-                - coinstate.at_head.block_by_height[
-                    coinstate.head().height - n
-                ].timestamp
-            )
-=======
             diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
->>>>>>> parent of acb1901... Fix: format all files
             return diff / (DESIRED_BLOCK_TIMESPAN * n)
 
         def get_network_hash_rate(n: int) -> float:
             assert coinstate
             total_over_blocks = sum(
-<<<<<<< HEAD
-                calc_work(
-                    coinstate.at_head.block_by_height[
-                        coinstate.head().height - i
-                    ].target
-                )
-                for i in range(n)
-            )
-
-            diff: int = (
-                coinstate.head().timestamp
-                - coinstate.at_head.block_by_height[
-                    coinstate.head().height - n
-                ].timestamp
-            )
-=======
                 calc_work(coinstate.at_head.block_by_height[coinstate.head().height - i].target) for i in range(n))
 
             diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
->>>>>>> parent of acb1901... Fix: format all files
 
             return total_over_blocks / diff
 
