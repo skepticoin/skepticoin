@@ -22,19 +22,24 @@ def select_block_height(input_hash: bytes, current_height: int) -> int:
     # the near future because (1 << 64) // (60 * 60 * 24 * 365) == 584_942_417_355 years if we use 1s blocks
 
     # current_height is the height of the block which hash we're mining/verifying
+<<<<<<< HEAD
     base = int.from_bytes(input_hash[:8], byteorder="big", signed=False)
+=======
+
+    base = int.from_bytes(input_hash[:8], byteorder='big', signed=False)
+>>>>>>> parent of acb1901... Fix: format all files
     return base % current_height
 
 
 def select_block_slice(hash: bytes, serialized_block: bytes, length: int) -> bytes:
     # we interpret the next 4 bytes of the hash as a number, and then modulo block length. Support for up to 4GiB blocks
 
-    base = int.from_bytes(hash[8:12], byteorder="big", signed=False)
+    base = int.from_bytes(hash[8:12], byteorder='big', signed=False)
     start = base % len(serialized_block)
 
     result = b""
     while len(result) < length:
-        result += serialized_block[start : start + length - len(result)]
+        result += serialized_block[start:start + length - len(result)]
         start = 0
 
     return result
@@ -53,6 +58,7 @@ def select_slice_from_chain(
     return select_block_slice(input_hash, selected_block.serialize(), length)
 
 
+<<<<<<< HEAD
 def select_n_k_length_slices_from_chain(
     starting_hash: bytes,
     current_height: int,
@@ -60,13 +66,14 @@ def select_n_k_length_slices_from_chain(
     n: int,
     k: int,
 ) -> bytes:
+=======
+def select_n_k_length_slices_from_chain(starting_hash, current_height, get_block_by_height, n, k):
+>>>>>>> parent of acb1901... Fix: format all files
     result = []
 
     current_hash = starting_hash
     for i in range(n):
-        b = select_slice_from_chain(
-            current_hash, current_height, get_block_by_height, k
-        )
+        b = select_slice_from_chain(current_hash, current_height, get_block_by_height, k)
         result.append(b)
 
         if i != n - 1:

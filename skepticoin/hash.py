@@ -1,5 +1,4 @@
 import hashlib
-
 from scrypt import hash as scrypt_hash
 
 

@@ -4,15 +4,14 @@ from skepticoin.scripts.utils import (
     configure_logging_from_args,
     open_or_init_wallet,
     save_wallet,
+    configure_logging_from_args,
+    DefaultArgumentParser,
 )
 
 
 def main() -> None:
     parser = DefaultArgumentParser()
-    parser.add_argument(
-        "annotation",
-        help="Some text to help you remember a meaning for this receive address.",
-    )
+    parser.add_argument("annotation", help="Some text to help you remember a meaning for this receive address.")
     args = parser.parse_args()
     configure_logging_from_args(args)
 

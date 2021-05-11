@@ -1,23 +1,23 @@
-import random
-from decimal import Decimal
 from pathlib import Path
+from decimal import Decimal
+import random
+
+from skepticoin.params import SASHIMI_PER_COIN
+from skepticoin.consensus import construct_block_for_mining
+from skepticoin.signing import SECP256k1PublicKey
+from skepticoin.wallet import save_wallet
+from skepticoin.utils import block_filename
 from time import time
 
-from skepticoin.consensus import construct_block_for_mining
-from skepticoin.params import SASHIMI_PER_COIN
-from skepticoin.signing import SECP256k1PublicKey
-from skepticoin.utils import block_filename
-from skepticoin.wallet import save_wallet
-
 from .utils import (
-    DefaultArgumentParser,
+    initialize_peers_file,
+    create_chain_dir,
+    read_chain_from_disk,
+    open_or_init_wallet,
+    start_networking_peer_in_background,
     check_for_fresh_chain,
     configure_logging_from_args,
-    create_chain_dir,
-    initialize_peers_file,
-    open_or_init_wallet,
-    read_chain_from_disk,
-    start_networking_peer_in_background,
+    DefaultArgumentParser,
 )
 
 
@@ -42,9 +42,7 @@ def main() -> None:
         print("Starting main loop")
 
         while True:
-            public_key = wallet.get_annotated_public_key(
-                "reserved for potentially mined block"
-            )
+            public_key = wallet.get_annotated_public_key("reserved for potentially mined block")
             save_wallet(wallet)
 
             nonce = random.randrange(1 << 32)
@@ -60,13 +58,7 @@ def main() -> None:
                 coinstate, transactions = thread.local_peer.chain_manager.get_state()
                 increasing_time = max(int(time()), coinstate.head().timestamp + 1)
                 block = construct_block_for_mining(
-                    coinstate,
-                    transactions,
-                    SECP256k1PublicKey(public_key),
-                    increasing_time,
-                    b"",
-                    nonce,
-                )
+                    coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
 
                 i += 1
                 nonce = (nonce + 1) % (1 << 32)
@@ -74,13 +66,10 @@ def main() -> None:
                     break
 
             coinstate = coinstate.add_block(block, int(time()))
-            with open(Path("chain") / block_filename(block), "wb") as f:
+            with open(Path('chain') / block_filename(block), 'wb') as f:
                 f.write(block.serialize())
             print("FOUND", block_filename(block))
-            print(
-                "Wallet balance: %s skepticoin"
-                % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN))
-            )
+            print("Wallet balance: %s skepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
 
             thread.local_peer.chain_manager.set_coinstate(coinstate)
             thread.local_peer.network_manager.broadcast_block(block)

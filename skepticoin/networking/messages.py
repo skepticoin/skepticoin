@@ -8,25 +8,27 @@ from typing import Dict, List, Type
 from skepticoin.datatypes import Block, BlockHeader, Transaction
 from skepticoin.serialization import (
     DeserializationError,
-    Serializable,
     safe_read,
+    Serializable,
     stream_deserialize_list,
     stream_deserialize_vlq,
     stream_serialize_list,
     stream_serialize_vlq,
 )
+from ..datatypes import Block, BlockHeader, Transaction
 
-MSG_HELLO = b"\x00\x00"
-MSG_GET_BLOCKS = b"\x00\x01"
-MSG_INVENTORY = b"\x00\x02"
-MSG_GET_DATA = b"\x00\x03"
-MSG_DATA = b"\x00\x04"
-MSG_GET_PEERS = b"\x00\x05"
-MSG_PEERS = b"\x00\x06"
 
-DATA_BLOCK = b"\x00\x00"
-DATA_HEADER = b"\x00\x01"
-DATA_TRANSACTION = b"\x00\x02"
+MSG_HELLO = b'\x00\x00'
+MSG_GET_BLOCKS = b'\x00\x01'
+MSG_INVENTORY = b'\x00\x02'
+MSG_GET_DATA = b'\x00\x03'
+MSG_DATA = b'\x00\x04'
+MSG_GET_PEERS = b'\x00\x05'
+MSG_PEERS = b'\x00\x06'
+
+DATA_BLOCK = b'\x00\x00'
+DATA_HEADER = b'\x00\x01'
+DATA_TRANSACTION = b'\x00\x02'
 
 
 DATATYPES: Dict[bytes, Type[Serializable]] = {
@@ -68,18 +70,14 @@ class MessageHeader(Serializable):
         f.write(struct.pack(b">I", self.in_response_to))
         f.write(struct.pack(b">Q", self.context))
 
-        f.write(b"\x00" * 32)  # reserved space for later versions
+        f.write(b'\x00' * 32)  # reserved space for later versions
 
     def format(self) -> str:
-        return "t%010d-i%010d-r%010d-c%020d" % (
-            self.timestamp,
-            self.id,
-            self.in_response_to,
-            self.context,
-        )
+        return "t%010d-i%010d-r%010d-c%020d" % (self.timestamp, self.id, self.in_response_to, self.context)
 
 
 class Message(Serializable):
+
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> Message:
         type_indicator = safe_read(f, 2)
@@ -171,15 +169,7 @@ class HelloMessage(Message):
 
         safe_read(f, 256)  # reserved space for later versions
 
-        return cls(
-            supported_versions,
-            your_ip_address,
-            your_port,
-            my_ip_address,
-            my_port,
-            nonce,
-            user_agent,
-        )
+        return cls(supported_versions, your_ip_address, your_port, my_ip_address, my_port, nonce, user_agent)
 
     def stream_serialize(self, f: BytesIO) -> None:
         f.write(MSG_HELLO)
@@ -198,7 +188,7 @@ class HelloMessage(Message):
 
         stream_serialize_list(f, self.supported_versions)
 
-        f.write(b"\x00" * 256)  # reserved space for later versions
+        f.write(b'\x00' * 256)  # reserved space for later versions
 
 
 class GetBlocksMessage(Message):
@@ -213,7 +203,7 @@ class GetBlocksMessage(Message):
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> GetBlocksMessage:
         # type_indicator has been read already by the superclass at this point.
-        if safe_read(f, 1) != b"\x00":
+        if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 GetBlocksMessage")
 
         potential_start_hashes = []
@@ -259,7 +249,7 @@ class InventoryMessage(Message):
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> InventoryMessage:
         # type_indicator has been read already by the superclass at this point.
-        if safe_read(f, 1) != b"\x00":
+        if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 InventoryMessage")
 
         items = stream_deserialize_list(f, InventoryItem)
@@ -281,7 +271,7 @@ class GetDataMessage(Message):
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> GetDataMessage:
         # type_indicator has been read already by the superclass at this point.
-        if safe_read(f, 1) != b"\x00":
+        if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 GetDataMessage")
 
         data_type = safe_read(f, 2)
@@ -307,7 +297,7 @@ class DataMessage(Message):
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> DataMessage:
         # type_indicator has been read already by the superclass at this point.
-        if safe_read(f, 1) != b"\x00":
+        if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 DataMessage")
 
         data_type = safe_read(f, 2)
@@ -332,7 +322,7 @@ class GetPeersMessage(Message):
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> GetPeersMessage:
         # type_indicator has been read already by the superclass at this point.
-        if safe_read(f, 1) != b"\x00":
+        if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 GetPeersMessage")
 
         return cls()
@@ -370,7 +360,7 @@ class PeersMessage(Message):
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> PeersMessage:
         # type_indicator has been read already by the superclass at this point.
-        if safe_read(f, 1) != b"\x00":
+        if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 GetPeersMessage")
 
         peers = stream_deserialize_list(f, Peer)

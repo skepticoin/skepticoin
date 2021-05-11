@@ -1,32 +1,28 @@
-import argparse
-import logging
-import os
 import sys
-import tempfile
 import urllib.request
 from pathlib import Path
 from time import sleep, time
 from typing import Any
+import os
+import tempfile
+import logging
+import argparse
 
-from skepticoin.coinstate import CoinState
 from skepticoin.datatypes import Block
+from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
+from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.networking.utils import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
-from skepticoin.wallet import Wallet, save_wallet
+
+from time import time, sleep
 
 
 class DefaultArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
-        self.add_argument(
-            "--dont-listen",
-            help="Don't listen for incoming connections",
-            action="store_true",
-        )
-        self.add_argument(
-            "--listening-port", help="Port to listen on", type=int, default=2412
-        )
+        self.add_argument("--dont-listen", help="Don't listen for incoming connections", action="store_true")
+        self.add_argument("--listening-port", help="Port to listen on", type=int, default=2412)
         self.add_argument("--log-to-file", help="Log to file", action="store_true")
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
 
@@ -42,18 +38,14 @@ def initialize_peers_file() -> None:
 def create_chain_dir() -> None:
     if not os.path.exists("chain"):
         print("Created new directory for chain")
-        os.makedirs("chain")
+        os.makedirs('chain')
 
 
 def check_for_fresh_chain(thread: NetworkingThread) -> bool:
     # wait until your chain is no more than 20 typical block-sizes old before you start mining yourself
     waited = False
     try:
-        while (
-            thread.local_peer.chain_manager.coinstate.head().timestamp
-            + (20 * DESIRED_BLOCK_TIMESPAN)
-            < time()
-        ):
+        while thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN) < time():
             waited = True
             thread.local_peer.show_stats()
             print("Waiting for fresh chain")
@@ -74,12 +66,12 @@ def check_for_fresh_chain(thread: NetworkingThread) -> bool:
 def read_chain_from_disk() -> CoinState:
     print("Reading chain from disk")
     coinstate = CoinState.zero()
-    for filename in sorted(os.listdir("chain")):
+    for filename in sorted(os.listdir('chain')):
         height = int(filename.split("-")[0])
         if height % 1000 == 0:
             print(filename)
 
-        block = Block.stream_deserialize(open(Path("chain") / filename, "rb"))
+        block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
         coinstate = coinstate.add_block_no_validation(block)
 
     return coinstate
@@ -109,13 +101,9 @@ def start_networking_peer_in_background(
 
 
 def configure_logging_for_file() -> None:
-    log_filename = Path(tempfile.gettempdir()) / (
-        "skepticoin-networking-%s.log" % int(time())
-    )
-    FORMAT = "%(asctime)s %(message)s"
-    logging.basicConfig(
-        format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO
-    )
+    log_filename = Path(tempfile.gettempdir()) / ("skepticoin-networking-%s.log" % int(time()))
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
 
 
 def configure_logging_for_stdout() -> None:

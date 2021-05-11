@@ -4,19 +4,21 @@ from ptpython.entry_points.run_ptpython import get_config_and_history_file
 from ptpython.repl import PythonRepl, embed, run_config
 
 import skepticoin.datatypes
-import skepticoin.humans
 import skepticoin.networking.messages
 import skepticoin.signing
-from skepticoin.__version__ import __version__
+import skepticoin.humans
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.scripts.utils import (
     DefaultArgumentParser,
     configure_logging_from_args,
     create_chain_dir,
     initialize_peers_file,
-    open_or_init_wallet,
+    create_chain_dir,
     read_chain_from_disk,
+    open_or_init_wallet,
     start_networking_peer_in_background,
+    configure_logging_from_args,
+    DefaultArgumentParser,
 )
 
 
@@ -43,20 +45,15 @@ def main() -> None:
     print("Starting REPL, exit with exit()")
     try:
         locals = {
-            "thread": thread,
-            "local_peer": thread.local_peer,
-            "show_stats": thread.local_peer.show_stats,
-            "wallet": wallet,
-            "get_coinstate": lambda: thread.local_peer.chain_manager.coinstate,
-            "SASHIMI_PER_COIN": SASHIMI_PER_COIN,
+            'thread': thread,
+            'local_peer': thread.local_peer,
+            'show_stats': thread.local_peer.show_stats,
+            'wallet': wallet,
+            'get_coinstate': lambda: thread.local_peer.chain_manager.coinstate,
+            'SASHIMI_PER_COIN': SASHIMI_PER_COIN,
         }
 
-        for module in [
-            skepticoin.datatypes,
-            skepticoin.networking.messages,
-            skepticoin.signing,
-            skepticoin.humans,
-        ]:
+        for module in [skepticoin.datatypes, skepticoin.networking.messages, skepticoin.signing, skepticoin.humans]:
             for attr in module.__all__:
                 locals[attr] = getattr(module, attr)
 

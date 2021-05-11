@@ -2,38 +2,30 @@ from time import sleep
 
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.signing import SECP256k1PublicKey
-from skepticoin.wallet import (
-    create_spend_transaction,
-    is_valid_address,
-    parse_address,
-    save_wallet,
-)
+from skepticoin.wallet import save_wallet
+from skepticoin.wallet import is_valid_address, parse_address, create_spend_transaction
 
 from .utils import (
-    DefaultArgumentParser,
+    initialize_peers_file,
+    create_chain_dir,
+    read_chain_from_disk,
+    open_or_init_wallet,
+    start_networking_peer_in_background,
     check_for_fresh_chain,
     configure_logging_from_args,
-    create_chain_dir,
-    initialize_peers_file,
-    open_or_init_wallet,
-    read_chain_from_disk,
-    start_networking_peer_in_background,
+    DefaultArgumentParser,
 )
 
 
 def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument("amount", help="The amount of to send", type=int)
-    parser.add_argument(
-        "denomination",
-        help="'skepticoin' or 'sashimi'",
-        choices=["skepticoin", "sashimi"],
-    )
+    parser.add_argument("denomination", help="'skepticoin' or 'sashimi'", choices=['skepticoin', 'sashimi'])
     parser.add_argument("address", help="The address to send to")
     args = parser.parse_args()
     configure_logging_from_args(args)
 
-    value = args.amount * (SASHIMI_PER_COIN if args.denomination == "skepticoin" else 1)
+    value = args.amount * (SASHIMI_PER_COIN if args.denomination == 'skepticoin' else 1)
 
     if not is_valid_address(args.address):
         print("Invalid address")
@@ -83,17 +75,9 @@ def main() -> None:
             for i in range(10):
                 block = coinstate.by_height_at_head()[max(max_height - i, 0)]
                 if transaction in block.transactions:
-                    print(
-                        "Transaction confirmed at",
-                        block.height,
-                        "with",
-                        i,
-                        "confirmation blocks",
-                    )
+                    print("Transaction confirmed at", block.height, "with", i, "confirmation blocks")
 
-                    if (
-                        i == 6
-                    ):  # this is the magic number of confirmations according to the "literature" on the subject
+                    if i == 6:  # this is the magic number of confirmations according to the "literature" on the subject
                         thread.stop()
                         return
 

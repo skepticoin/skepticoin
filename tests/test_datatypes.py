@@ -1,3 +1,4 @@
+from skepticoin.signing import SECP256k1Signature, SECP256k1PublicKey
 from skepticoin.datatypes import (
     Block,
     BlockHeader,
@@ -9,7 +10,6 @@ from skepticoin.datatypes import (
     Transaction,
 )
 from skepticoin.humans import computer
-from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
 
 
 def serialize_and_deserialize(thing):
@@ -40,12 +40,7 @@ def test_output_serialization():
 
 def test_transaction_serialization():
     trans = Transaction(
-        inputs=[
-            Input(
-                output_reference=OutputReference(b"b" * 32, 1234),
-                signature=SECP256k1Signature(b"b" * 64),
-            )
-        ],
+        inputs=[Input(output_reference=OutputReference(b"b" * 32, 1234), signature=SECP256k1Signature(b"b" * 64))],
         outputs=[Output(value=1582, public_key=SECP256k1PublicKey(b"g" * 64))],
     )
     serialize_and_deserialize(trans)
@@ -53,19 +48,11 @@ def test_transaction_serialization():
 
 def test_transaction_repr():
     trans = Transaction(
-        inputs=[
-            Input(
-                output_reference=OutputReference(b"b" * 32, 1234),
-                signature=SECP256k1Signature(b"b" * 64),
-            )
-        ],
+        inputs=[Input(output_reference=OutputReference(b"b" * 32, 1234), signature=SECP256k1Signature(b"b" * 64))],
         outputs=[Output(value=1582, public_key=SECP256k1PublicKey(b"g" * 64))],
     )
 
-    assert (
-        repr(trans)
-        == "Transaction #4025f3f13790dc96d857562dabcdd257ee9dfd95ce126e11d8cbbe64ac1bbec4"
-    )
+    assert repr(trans) == "Transaction #4025f3f13790dc96d857562dabcdd257ee9dfd95ce126e11d8cbbe64ac1bbec4"
 
 
 example_block_summary = BlockSummary(
@@ -107,18 +94,10 @@ def test_block_serialization():
             summary=example_block_summary,
             pow_evidence=example_pow_evidence,
         ),
-        transactions=[
-            Transaction(
-                inputs=[
-                    Input(
-                        output_reference=OutputReference(b"b" * 32, 1234),
-                        signature=SECP256k1Signature(b"b" * 64),
-                    )
-                ],
-                outputs=[Output(value=1582, public_key=SECP256k1PublicKey(b"g" * 64))],
-            )
-        ]
-        * 2,
+        transactions=[Transaction(
+            inputs=[Input(output_reference=OutputReference(b"b" * 32, 1234), signature=SECP256k1Signature(b"b" * 64))],
+            outputs=[Output(value=1582, public_key=SECP256k1PublicKey(b"g" * 64))],
+        )] * 2,
     )
 
     serialize_and_deserialize(block)

@@ -35,9 +35,23 @@ from .datatypes import (
 from .pow import select_n_k_length_slices_from_chain
 from .serialization import serialize_list
 from .signing import CoinbaseData, SECP256k1PublicKey
+from .humans import human, computer
+from .params import (
+    MAX_SASHIMI, MAX_BLOCK_SIZE, MAX_FUTURE_BLOCK_TIME, MAX_COINBASE_RANDOM_DATA_SIZE,
+    BLOCKS_BETWEEN_TARGET_READJUSTMENT, DESIRED_TARGET_READJUSTMENT_TIMESPAN, SUBSIDY_HALVING_INTERVAL, INITIAL_SUBSIDY,
+    CHAIN_SAMPLE_TOTAL_SIZE, CHAIN_SAMPLE_COUNT, CHAIN_SAMPLE_SIZE, INITIAL_TARGET
+)
+from .serialization import serialize_list
+from .signing import CoinbaseData
+from .merkletree import get_merkle_root
+from .datatypes import OutputReference, Input, Output, Transaction, BlockSummary, PowEvidence, BlockHeader, Block
+from .hash import scrypt, blake2
+from .pow import select_n_k_length_slices_from_chain
+from .coinstate import CoinState
+from .cheating import KNOWN_HASHES, MAX_KNOWN_HASH_HEIGHT
+
 
 # ## Section: Shared between Construction & Validation
-
 
 def calc_merkle_root_hash(transactions: List[Transaction]) -> bytes:
     return get_merkle_root([transaction.hash() for transaction in transactions])
@@ -51,9 +65,7 @@ def calc_target(
 ) -> bytes:
     if height % BLOCKS_BETWEEN_TARGET_READJUSTMENT == 0:
         interval_start_height = height - BLOCKS_BETWEEN_TARGET_READJUSTMENT
-        interval_start_block = coinstate.block_by_height_by_hash[previous_block.hash()][
-            interval_start_height
-        ]
+        interval_start_block = coinstate.block_by_height_by_hash[previous_block.hash()][interval_start_height]
         time_passed = current_timestamp - interval_start_block.timestamp
         return calculate_new_target(previous_block.target, time_passed)
 
@@ -63,12 +75,10 @@ def calc_target(
 # ## Section: Construction of new Blocks
 
 
-def construct_minable_summary_genesis(
-    transactions: List[Transaction], current_timestamp: int, nonce: int
-) -> BlockSummary:
+def construct_minable_summary_genesis(transactions: List[Transaction], current_timestamp: int, nonce: int) -> BlockSummary:
     return BlockSummary(
         height=0,
-        previous_block_hash=b"\x00" * 32,
+        previous_block_hash=b'\x00' * 32,
         merkle_root_hash=calc_merkle_root_hash(transactions),
         timestamp=current_timestamp,
         target=INITIAL_TARGET,
@@ -118,10 +128,7 @@ def get_block_fees(
     unspent_transaction_outs: Mapping[OutputReference, Output],
 ) -> int:
     # Because intra-block cross-transaction-spending is illegal, no need to manipulate refetch unspent_transaction_outs
-    return sum(
-        get_transaction_fee(transaction, unspent_transaction_outs)
-        for transaction in non_coinbase_transactions
-    )
+    return sum(get_transaction_fee(transaction, unspent_transaction_outs) for transaction in non_coinbase_transactions)
 
 
 def get_block_subsidy(height: int) -> int:
@@ -134,7 +141,7 @@ def get_block_subsidy(height: int) -> int:
 
 
 def construct_reference_to_thin_air() -> OutputReference:
-    return OutputReference(b"\x00" * 32, 0)
+    return OutputReference(b'\x00' * 32, 0)
 
 
 def construct_coinbase_transaction(
@@ -172,27 +179,20 @@ def construct_pow_evidence(
     transactions: List[Transaction],
 ) -> PowEvidence:
     # Part 1 of the POW is to run scrypt. We put the most expensive operation first in an attempt to "up the ante"
-    summary_hash = scrypt(
-        summary.serialize(), current_height.to_bytes(8, byteorder="big")
-    )
+    summary_hash = scrypt(summary.serialize(), current_height.to_bytes(8, byteorder='big'))
 
     # Part 2 of the POW is to prove that you have fast access to the whole blockchain. This is to help actual full nodes
     # vis-a-vis opportunistic miners.
     if current_height == 0:
         # in the genesis block we can't sample from the chain yet
-        chain_sample = b"\00" * CHAIN_SAMPLE_TOTAL_SIZE
+        chain_sample = b'\00' * CHAIN_SAMPLE_TOTAL_SIZE
     else:
 
         def get_block_by_height(h: int) -> Block:
             return coinstate.block_by_height_by_hash[summary.previous_block_hash][h]  # type: ignore
 
         chain_sample = select_n_k_length_slices_from_chain(
-            summary_hash,
-            current_height,
-            get_block_by_height,
-            CHAIN_SAMPLE_COUNT,
-            CHAIN_SAMPLE_SIZE,
-        )
+            summary_hash, current_height, get_block_by_height, CHAIN_SAMPLE_COUNT, CHAIN_SAMPLE_SIZE)
 
     serialized_transactions = serialize_list(transactions)
 
@@ -230,18 +230,11 @@ def construct_block_for_mining_genesis(
     unspent_transaction_outs = immutables.Map()
 
     coinbase_transaction = construct_coinbase_transaction(
-        current_height,
-        non_coinbase_transactions,
-        unspent_transaction_outs,
-        random_data,
-        miner_public_key,
-    )
+        current_height, non_coinbase_transactions, unspent_transaction_outs, random_data, miner_public_key)
 
     transactions = [coinbase_transaction] + non_coinbase_transactions
 
-    summary = construct_minable_summary(
-        coinstate, transactions, current_timestamp, nonce
-    )
+    summary = construct_minable_summary(coinstate, transactions, current_timestamp, nonce)
     evidence = construct_pow_evidence(coinstate, summary, current_height, transactions)
     return Block(BlockHeader(summary, evidence), transactions)
 
@@ -258,23 +251,14 @@ def construct_block_for_mining(
     previous_block = coinstate.head()
     current_height = previous_block.height + 1
 
-    unspent_transaction_outs = coinstate.unspent_transaction_outs_by_hash[
-        coinstate.current_chain_hash
-    ]
+    unspent_transaction_outs = coinstate.unspent_transaction_outs_by_hash[coinstate.current_chain_hash]
 
     coinbase_transaction = construct_coinbase_transaction(
-        current_height,
-        non_coinbase_transactions,
-        unspent_transaction_outs,
-        random_data,
-        miner_public_key,
-    )
+        current_height, non_coinbase_transactions, unspent_transaction_outs, random_data, miner_public_key)
 
     transactions = [coinbase_transaction] + non_coinbase_transactions
 
-    summary = construct_minable_summary(
-        coinstate, transactions, current_timestamp, nonce
-    )
+    summary = construct_minable_summary(coinstate, transactions, current_timestamp, nonce)
     evidence = construct_pow_evidence(coinstate, summary, current_height, transactions)
     return Block(BlockHeader(summary, evidence), transactions)
 
@@ -337,24 +321,18 @@ def validate_non_coinbase_transaction_by_itself(transaction: Transaction) -> Non
     output_references = set()
     for input in transaction.inputs:
         if input.output_reference in output_references:
-            raise ValidateTransactionError(
-                "Single output_reference referenced more than once in single transaction."
-            )
+            raise ValidateTransactionError("Single output_reference referenced more than once in single transaction.")
         output_references.add(input.output_reference)
 
     for input in transaction.inputs:
         if input.output_reference.references_thin_air():
-            raise ValidateTransactionError(
-                "Coinbase-like null-reference in non-coinbase transaction."
-            )
+            raise ValidateTransactionError("Coinbase-like null-reference in non-coinbase transaction.")
 
         assert input.signature
         if input.signature.is_not_signature():
             # as elsewhere: "in theory" this is redundant, because such a signature will never validate an output
             # anyway. checking it here allows us to catch such duplications even without the context of a full chain.
-            raise ValidateTransactionError(
-                "Non-signature Signature class used where a real one is expected."
-            )
+            raise ValidateTransactionError("Non-signature Signature class used where a real one is expected.")
 
 
 def validate_signature_for_spend(
@@ -368,17 +346,13 @@ def validate_signature_for_spend(
 
 def validate_coinbase_transaction_by_itself(transaction: Transaction) -> None:
     if not len(transaction.inputs) == 1:
-        raise ValidateTransactionError(
-            "Coinbase transaction should have precisely 1 input"
-        )
+        raise ValidateTransactionError("Coinbase transaction should have precisely 1 input")
 
     if not transaction.inputs[0].output_reference.references_thin_air():
         raise ValidateTransactionError("Coinbase must create its value out of thin air")
 
     if not isinstance(transaction.inputs[0].signature, CoinbaseData):
-        raise ValidateTransactionError(
-            "A coinbase transaction should have CoinbaseData"
-        )
+        raise ValidateTransactionError("A coinbase transaction should have CoinbaseData")
 
     if len(transaction.inputs[0].signature.signature) > MAX_COINBASE_RANDOM_DATA_SIZE:
         raise ValidateTransactionError("Random data > MAX_COINBASE_RANDOM_DATA_SIZE")
@@ -448,9 +422,7 @@ def validate_block_by_itself(block: Block, current_timestamp: int) -> None:
     # the block (i.e. the spending inside blocks isn't reflected in that check)
     validate_no_duplicate_output_references_in_transactions(block.transactions[1:])
 
-    if block.header.summary.merkle_root_hash != calc_merkle_root_hash(
-        block.transactions
-    ):
+    if block.header.summary.merkle_root_hash != calc_merkle_root_hash(block.transactions):
         raise ValidateBlockError("Incorrect merkle_root_hash")
 
 
@@ -464,14 +436,12 @@ def validate_coinbase_transaction_in_coinstate(
     if block.height != calculated_current_height:
         raise ValidateBlockHeaderError("Block's reported height incorrect.")
 
-    unspent_transaction_outs = coinstate.unspent_transaction_outs_by_hash[
-        block.header.summary.previous_block_hash
-    ]
+    unspent_transaction_outs = coinstate.unspent_transaction_outs_by_hash[block.header.summary.previous_block_hash]
     fees = get_block_fees(block.transactions[1:], unspent_transaction_outs)
     subsidy = get_block_subsidy(block.height)
 
     if sum(output.value for output in transaction.outputs) > fees + subsidy:
-        raise ValidateTransactionError("Transaction overspending (Coinbase)")
+        raise ValidateTransactionError('Transaction overspending (Coinbase)')
 
 
 def validate_non_coinbase_transaction_in_coinstate(
@@ -488,9 +458,7 @@ def validate_non_coinbase_transaction_in_coinstate(
 
     for input in transaction.inputs:
         if input.output_reference not in unspent_transaction_outs:
-            raise ValidateTransactionError(
-                "input's output_reference does not exist as an unspent out"
-            )
+            raise ValidateTransactionError("input's output_reference does not exist as an unspent out")
 
         previous_output = unspent_transaction_outs[input.output_reference]
 
@@ -503,32 +471,26 @@ def validate_non_coinbase_transaction_in_coinstate(
         total_input_value += previous_output.value
 
     if sum(output.value for output in transaction.outputs) > total_input_value:
-        raise ValidateTransactionError("Transaction overspending")
+        raise ValidateTransactionError('Transaction overspending')
 
 
 def calculate_new_target(previous_target: bytes, actual_time_passed: int) -> bytes:
-    i_previous_target = int.from_bytes(previous_target, byteorder="big", signed=False)
+    i_previous_target = int.from_bytes(previous_target, byteorder='big', signed=False)
 
     # multiplications first to avoid loss of precision; integer arithmetic only to avoid float-weirdness.
-    result = (
-        i_previous_target * actual_time_passed
-    ) // DESIRED_TARGET_READJUSTMENT_TIMESPAN
+    result = (i_previous_target * actual_time_passed) // DESIRED_TARGET_READJUSTMENT_TIMESPAN
 
     if result > pow(2, 32 * 8) - 1:
-        result = (
-            pow(2, 32 * 8) - 1
-        )  # TBH we have bigger problems if the target has become "anything goes", but still..
+        result = pow(2, 32 * 8) - 1  # TBH we have bigger problems if the target has become "anything goes", but still..
 
-    return result.to_bytes(32, byteorder="big", signed=False)
+    return result.to_bytes(32, byteorder='big', signed=False)
 
 
 def validate_block_summary_in_coinstate(
     block_summary: BlockSummary, coinstate: CoinState
 ) -> None:
     if block_summary.previous_block_hash not in coinstate.block_by_hash:
-        raise ValidateBlockHeaderError(
-            "previous_block_hash unknown: %s" % human(block_summary.previous_block_hash)
-        )
+        raise ValidateBlockHeaderError("previous_block_hash unknown: %s" % human(block_summary.previous_block_hash))
 
     previous_block = coinstate.block_by_hash[block_summary.previous_block_hash]
 
@@ -540,9 +502,7 @@ def validate_block_summary_in_coinstate(
     previous_height = previous_block.height
     calculated_current_height = previous_height + 1
 
-    calculated_target = calc_target(
-        coinstate, calculated_current_height, block_summary.timestamp, previous_block
-    )
+    calculated_target = calc_target(coinstate, calculated_current_height, block_summary.timestamp, previous_block)
 
     if block_summary.target != calculated_target:
         raise ValidateBlockHeaderError("Block's reported target incorrect")
@@ -552,9 +512,7 @@ def validate_block_in_coinstate(block: Block, coinstate: CoinState) -> None:
     if block.height <= MAX_KNOWN_HASH_HEIGHT:
         if block.height in KNOWN_HASHES:
             if block.hash() != computer(KNOWN_HASHES[block.height]):
-                raise ValidationError(
-                    "No forks allowed before block %s" % MAX_KNOWN_HASH_HEIGHT
-                )
+                raise ValidationError("No forks allowed before block %s" % MAX_KNOWN_HASH_HEIGHT)
 
         # all in-coinstate validation is skipped for such blocks; this may lead to invalid blocks being accepted in your
         # local coinstate, but never beyond one of the checkpoints from KNOWN_HASHES
@@ -562,9 +520,7 @@ def validate_block_in_coinstate(block: Block, coinstate: CoinState) -> None:
 
     validate_block_summary_in_coinstate(block.header.summary, coinstate)
 
-    reconstructed_evidence = construct_pow_evidence(
-        coinstate, block.header.summary, block.height, block.transactions
-    )
+    reconstructed_evidence = construct_pow_evidence(coinstate, block.header.summary, block.height, block.transactions)
     if block.header.pow_evidence != reconstructed_evidence:
         raise ValidateBlockError("POW Evidence incorrect")
 
@@ -572,6 +528,4 @@ def validate_block_in_coinstate(block: Block, coinstate: CoinState) -> None:
     validate_coinbase_transaction_in_coinstate(coinbase_transaction, block, coinstate)
 
     for transaction in block.transactions[1:]:
-        validate_non_coinbase_transaction_in_coinstate(
-            transaction, block.previous_block_hash, coinstate
-        )
+        validate_non_coinbase_transaction_in_coinstate(transaction, block.previous_block_hash, coinstate)

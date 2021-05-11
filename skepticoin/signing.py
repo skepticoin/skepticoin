@@ -15,14 +15,15 @@ from typing import Any
 import ecdsa  # NOTE "This library was not designed with security in mind."
 
 from .humans import human
-from .serialization import DeserializationError, Serializable, safe_read
+from .serialization import Serializable, DeserializationError, safe_read
 
-TYPE_SIGNABLE_EQUIVALENT = b"\x00"
-TYPE_COINBASE_DATA = b"\x01"
-TYPE_SECP256k1 = b"\x02"
+TYPE_SIGNABLE_EQUIVALENT = b'\x00'
+TYPE_COINBASE_DATA = b'\x01'
+TYPE_SECP256k1 = b'\x02'
 
 
 class PublicKey(Serializable):
+
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> SECP256k1PublicKey:
         type_indicator = safe_read(f, 1)
@@ -38,7 +39,7 @@ class SECP256k1PublicKey(PublicKey):
 
     def __init__(self, public_key: bytes):
         if not len(public_key) == 64:
-            raise ValueError("SECP256k1 public key must be 64 bytes.")
+            raise ValueError('SECP256k1 public key must be 64 bytes.')
 
         self.public_key = public_key
 
@@ -46,10 +47,7 @@ class SECP256k1PublicKey(PublicKey):
         return "SECP256k1 Public Key %s" % human(self.public_key)
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, SECP256k1PublicKey)
-            and self.public_key == other.public_key
-        )
+        return isinstance(other, SECP256k1PublicKey) and self.public_key == other.public_key
 
     def __hash__(self) -> int:
         return hash(self.serialize())
@@ -78,6 +76,7 @@ class SECP256k1PublicKey(PublicKey):
 
 
 class Signature(Serializable):
+
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> Signature:
         type_indicator = safe_read(f, 1)
@@ -126,7 +125,7 @@ class CoinbaseData(Signature):
 
     def __init__(self, height: int, signature: bytes):
         if not (0 <= height <= 0xFFFFFFFF):
-            raise ValueError("CoinbaseData height %d out of range." % height)
+            raise ValueError("CoinbaseData height %d is out of range." % height)
 
         if len(signature) > 256:
             raise ValueError("Unserializable CoinbaseData")
@@ -138,11 +137,8 @@ class CoinbaseData(Signature):
 
     def __repr__(self) -> str:
         if all([32 <= b < 127 for b in self.signature]):
-            return 'CoinbaseData(%s, "%s")' % (
-                self.height,
-                str(self.signature, encoding="ascii"),
-            )
-        return "CoinbaseData(%s, #%s)" % (self.height, human(self.signature))
+            return 'CoinbaseData(%s, "%s")' % (self.height, str(self.signature, encoding="ascii"))
+        return 'CoinbaseData(%s, #%s)' % (self.height, human(self.signature))
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, CoinbaseData) and self.signature == other.signature
@@ -165,7 +161,7 @@ class CoinbaseData(Signature):
 class SECP256k1Signature(Signature):
     def __init__(self, signature: bytes):
         if not len(signature) == 64:
-            raise ValueError("SECP256k1 signature must be 64 bytes.")
+            raise ValueError('SECP256k1 signature must be 64 bytes.')
 
         self.signature = signature
 
@@ -173,9 +169,7 @@ class SECP256k1Signature(Signature):
         return "SECP256k1 Signature %s" % human(self.signature)
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, SECP256k1Signature) and self.signature == other.signature
-        )
+        return isinstance(other, SECP256k1Signature) and self.signature == other.signature
 
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> SECP256k1Signature:

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from .humans import human
+from .hash import sha256d
+
 from typing import List, Optional, TypeVar
 
 from skepticoin.hash import sha256d
@@ -36,7 +39,7 @@ class MerkleNode:
         if self.value is not None:
             return self.value
 
-        return sha256d(b"".join(c.hash() for c in self.children))
+        return sha256d(b''.join(c.hash() for c in self.children))
 
     def __repr__(self) -> str:
         return "M(%s, (%s))" % (human(self.hash())[:7], self.children)
@@ -57,35 +60,25 @@ def _get_merkle_tree(list_of_nodes: List[MerkleNode]) -> MerkleNode:
 
 
 def get_merkle_tree(list_of_hashes: List[bytes]) -> MerkleNode:
-    return _get_merkle_tree(
-        [MerkleNode(i, [], h) for (i, h) in enumerate(list_of_hashes)]
-    )
+    return _get_merkle_tree([MerkleNode(i, (), h) for (i, h) in enumerate(list_of_hashes)])
 
 
 def get_proof(merkle_node: MerkleNode, index_of_interest: int) -> MerkleNode:
     if not merkle_node.children:
         return merkle_node
 
-    def swap(ot: MerkleNode, rec: MerkleNode) -> List[MerkleNode]:
-        return [rec, ot]
-
-    def no_swap(ot: MerkleNode, rec: MerkleNode) -> List[MerkleNode]:
-        return [ot, rec]
-
     # our nodes always have either 0 or 2 children, never 1
     if index_of_interest >= merkle_node.children[1].index:
         other, recurse_into = merkle_node.children
-        reconstruct = no_swap
+        reconstruct = lambda ot, rec: (ot, rec) # noqa
     else:
         recurse_into, other = merkle_node.children
-        reconstruct = swap
+        reconstruct = lambda ot, rec: (rec, ot) # noqa
 
     simplified_other = MerkleNode(other.index, [], other.hash())
     recursion_result = get_proof(recurse_into, index_of_interest)
 
-    return MerkleNode(
-        merkle_node.index, reconstruct(simplified_other, recursion_result)
-    )
+    return MerkleNode(merkle_node.index, reconstruct(simplified_other, recursion_result))
 
 
 T = TypeVar("T")
@@ -97,4 +90,4 @@ def _chunks(lst: List[T], chunk_size: int) -> List[List[T]]:
     >>> list(chunks([0, 1, 2, 3, 4], 2))
     [[0, 1], [2, 3], [4]]
     """
-    return list(lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size))
+    return (lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size))
