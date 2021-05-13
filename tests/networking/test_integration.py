@@ -12,6 +12,7 @@ import socket
 from skepticoin.signing import SignableEquivalent, SECP256k1PublicKey
 from skepticoin.datatypes import Block, Transaction, Input, Output, OutputReference
 from skepticoin.coinstate import CoinState
+from skepticoin.networking.messages import InventoryMessage
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.networking.utils import load_peers_from_list
 
@@ -142,6 +143,52 @@ def test_broadcast_transaction(caplog, mocker):
                 raise Exception("Transaction broadcast failed")
 
             sleep(0.01)
+
+    finally:
+        thread_a.stop()
+        thread_a.join()
+
+        thread_b.stop()
+        thread_b.join()
+
+
+def test_broadcast_message_closed_connection_handling(caplog, mocker):
+    caplog.set_level(logging.INFO)
+
+    coinstate = _read_chain_from_disk(5)
+
+    thread_a = NetworkingThread(coinstate, 12412, FakeDiskInterface())
+    thread_a.start()
+
+    _try_to_connect('127.0.0.1', 12412)
+
+    thread_b = NetworkingThread(coinstate, 12413, FakeDiskInterface())
+    thread_b.local_peer.network_manager.disconnected_peers = load_peers_from_list([('127.0.0.1', 12412, "OUTGOING")])
+    thread_b.start()
+
+    try:
+        # give both peers some time to find each other
+        start_time = time()
+        while True:
+            if (len(thread_a.local_peer.network_manager.get_active_peers()) > 0 and
+                    len(thread_b.local_peer.network_manager.get_active_peers()) > 0):
+                break
+
+            if time() > start_time + 5:
+                print("\n".join(str(r) for r in caplog.records))
+                raise Exception("Peers can't connect")
+
+            sleep(0.01)
+
+        # do a hard disconnect (without going through local_peer.disconnect)
+        for remote_peer in thread_a.local_peer.network_manager.get_active_peers():
+            remote_peer.sock.close()
+
+        # broadcast a message
+        thread_a.local_peer.network_manager.broadcast_message(InventoryMessage([]))
+
+        # the error should have been logged
+        assert len([r for r in caplog.records if 'ChainManager.broadcast_message' in str(r)]) > 0
 
     finally:
         thread_a.stop()
