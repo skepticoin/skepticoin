@@ -23,10 +23,9 @@
 
 * The first time you start `skepticoin`, a new wallet is automatically generated for you, with 10.000 keypairs.
 
-* When the addresses run out, you'll get an error message; you'll have to generate some new ones manually. (This is in
-  fact a huge improvement over the early `bitcoin-core` client and many other cryptocurrency wallets, which would
-  quietly create new addresses on the fly. That approach has the not so small problem that any backups will no longer be
-  able to unlock all addresses in the wallet, i.e. reverting to your backup will lead to loss of coin)
+* When the addresses run out, you'll get an error message; you'll have to generate some new ones manually. (This is by
+  design: quietly adding new addresses in the background, as the early `bitcoin-core` client did, may lead to loss of
+  coin because it is not obvious that backups of the wallet have become outdated)
 
 * Each time a public key is earmarked for a purpose this fact is stored in your wallet.
 

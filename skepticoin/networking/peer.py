@@ -130,26 +130,20 @@ class NetworkManager(Manager):
 
     def broadcast_block(self, block):
         self.local_peer.logger.info("%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash())))
-        message = DataMessage(DATA_BLOCK, block)
-        for peer in self.get_active_peers():
-            try:
-                # try/except b/c .send_message might try to set the selector for a just-closed sock to writing
-                peer.send_message(message)
-            except OSError:  # e.g. ConnectionRefusedError, "Bad file descriptor"
-                pass
-            except (ValueError, KeyError):  # seen in the wild for selector problems; should be more exactly matched tho
-                pass
+        self.broadcast_message(DataMessage(DATA_BLOCK, block))
 
     def broadcast_transaction(self, transaction):
-        message = DataMessage(DATA_TRANSACTION, transaction)
+        self.broadcast_message(DataMessage(DATA_TRANSACTION, transaction))
+
+    def broadcast_message(self, message):
         for peer in self.get_active_peers():
             try:
                 # try/except b/c .send_message might try to set the selector for a just-closed sock to writing
                 peer.send_message(message)
-            except OSError:  # e.g. ConnectionRefusedError, "Bad file descriptor"
-                pass
-            except (ValueError, KeyError):  # seen in the wild for selector problems; should be more exactly matched tho
-                pass
+            except (OSError, ValueError, KeyError) as e:
+                # OSError: e.g. ConnectionRefusedError, "Bad file descriptor"
+                # ValueError, KeyError seen in the wild for selector problems; should be more exactly matched though
+                self.local_peer.logger.info("%15s ChainManager.broadcast_message error %s" % (peer.host, e))
 
 
 def inventory_batch_handled(peer):

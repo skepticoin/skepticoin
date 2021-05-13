@@ -1,5 +1,6 @@
 from pathlib import Path
 from decimal import Decimal
+from datetime import datetime
 import random
 
 from skepticoin.params import SASHIMI_PER_COIN
@@ -44,6 +45,11 @@ def miner(args, wallet_lock):
         print("Your blockchain is not just old, it is ancient; ABORTING")
         return
 
+    start_time = datetime.now()
+    start_balance = wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)
+    balance = start_balance
+    print("Wallet balance: %s skepticoin" % start_balance)
+
     print("Starting mining: A repeat minter")
 
     try:
@@ -57,20 +63,29 @@ def miner(args, wallet_lock):
 
             nonce = random.randrange(1 << 32)
             last_round_second = int(time())
-            i = 0
+            hashes = 0
 
             while True:
                 if int(time()) > last_round_second:
-                    print("Hashrate:", i)
+                    now = datetime.now()
+                    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+                    uptime = now - start_time
+                    uptime_str = str(uptime).split(".")[0]
+
+                    mined = balance - start_balance
+                    mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
+
+                    print(f"{now_str} | uptime: {uptime_str} | {hashes:>2} hash/sec" +
+                          f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
                     last_round_second = int(time())
-                    i = 0
+                    hashes = 0
 
                 coinstate, transactions = thread.local_peer.chain_manager.get_state()
                 increasing_time = max(int(time()), coinstate.head().timestamp + 1)
                 block = construct_block_for_mining(
                     coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
 
-                i += 1
+                hashes += 1
                 nonce = (nonce + 1) % (1 << 32)
                 if block.hash() < block.target:
                     break
@@ -81,8 +96,9 @@ def miner(args, wallet_lock):
 
             print("FOUND", block_filename(block))
             wallet_lock.acquire()
-            print("Wallet balance: %s skepticoin" % (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN)))
+            balance = (wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN))
             wallet_lock.release()
+            print("Wallet balance: %s skepticoin" % balance)
 
             thread.local_peer.chain_manager.set_coinstate(coinstate)
             thread.local_peer.network_manager.broadcast_block(block)
