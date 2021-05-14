@@ -33,6 +33,7 @@ setup(
             'skepticoin-receive=skepticoin.scripts.receive:main',
             'skepticoin-send=skepticoin.scripts.send:main',
             'skepticoin-repl=skepticoin.scripts.repl:main',
+            'skepticoin-run=skepticoin.scripts.run:main',
             'skepticoin-balance=skepticoin.scripts.balance:main',
         ],
     },
