@@ -13,16 +13,18 @@ from skepticoin.consensus import (
     construct_pow_evidence,
     get_block_subsidy,
     get_transaction_fee,
+    validate_non_coinbase_transaction_by_itself,
     validate_coinbase_transaction_by_itself,
     validate_block_header_by_itself,
     validate_block_by_itself,
     # validate_non_coinbase_transaction_in_coinstate,
+    ValidationError,
     ValidateBlockError,
     ValidateBlockHeaderError,
     ValidateTransactionError,
     ValidatePOWError,
 )
-from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
+from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature, SignableEquivalent
 from skepticoin.datatypes import Transaction, OutputReference, Input, Output, Block
 
 
@@ -96,27 +98,91 @@ def test_construct_pow_evidence_non_genesis_block():
 
 
 def test_validate_non_coinbase_transaction_by_itself_no_inputs():
-    pass  # TODO
+    transaction = Transaction(
+        inputs=[],
+        outputs=[Output(30, example_public_key)],
+    )
+
+    with pytest.raises(ValidateTransactionError, match=".*No inputs.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
 
 
 def test_validate_non_coinbase_transaction_by_itself_no_outputs():
-    pass  # TODO
+    transaction = Transaction(
+        inputs=[Input(
+            OutputReference(b'a' * 32, 1),
+            SECP256k1Signature(b'y' * 64),
+        )],
+        outputs=[],
+    )
+
+    with pytest.raises(ValidateTransactionError, match=".*No outputs.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
 
 
 def test_validate_non_coinbase_transaction_by_itself_max_size():
-    pass  # TODO
+    transaction = Transaction(
+        inputs=[Input(
+            OutputReference(b'a' * 32, 1),
+            SECP256k1Signature(b'y' * 64),
+        )] * 30_000,
+        outputs=[Output(30, example_public_key)]
+    )
+
+    with pytest.raises(ValidateTransactionError, match=".*MAX_BLOCK_SIZE.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
 
 
 def test_validate_non_coinbase_transaction_by_itself_max_total_output():
-    pass  # TODO
+    transaction = Transaction(
+        inputs=[Input(
+            OutputReference(b'a' * 32, 1),
+            SECP256k1Signature(b'y' * 64),
+        )],
+        outputs=[Output(21_000_000 * SASHIMI_PER_COIN, example_public_key)]
+    )
+
+    with pytest.raises(ValidationError, match=".out of range.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
 
 
-def test_validate_non_coinbase_transaction_by_itself_no_duplicate_transactions():
-    pass  # TODO
+def test_validate_non_coinbase_transaction_by_itself_no_duplicate_output_references():
+    transaction = Transaction(
+        inputs=[Input(
+            OutputReference(b'a' * 32, 1),
+            SECP256k1Signature(b'y' * 64),
+        )] * 2,
+        outputs=[Output(30, example_public_key)]
+    )
+
+    with pytest.raises(ValidateTransactionError, match=".*output_reference referenced more than once.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
 
 
 def test_validate_non_coinbase_transaction_by_itself_is_not_coinbase():
-    pass  # TODO
+    transaction = Transaction(
+        inputs=[Input(
+            OutputReference(b'\x00' * 32, 0),
+            SECP256k1Signature(b'y' * 64),
+        )],
+        outputs=[Output(30, example_public_key)]
+    )
+
+    with pytest.raises(ValidateTransactionError, match=".*null-reference in non-coinbase transaction.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
+
+
+def test_validate_non_coinbase_transaction_by_itself_():
+    transaction = Transaction(
+        inputs=[Input(
+            OutputReference(b'a' * 32, 1),
+            SignableEquivalent(),
+        )],
+        outputs=[Output(30, example_public_key)]
+    )
+
+    with pytest.raises(ValidateTransactionError, match=".*Non-signature Signature class used.*"):
+        validate_non_coinbase_transaction_by_itself(transaction)
 
 
 def test_validate_signature_for_spend():
