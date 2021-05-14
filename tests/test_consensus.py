@@ -1,13 +1,14 @@
 from copy import deepcopy
 import immutables
 import pytest
+from pathlib import Path
 
 from skepticoin.humans import computer
 from skepticoin.params import SASHIMI_PER_COIN, MAX_COINBASE_RANDOM_DATA_SIZE
 from skepticoin.coinstate import CoinState
 from skepticoin.consensus import (
     construct_minable_summary_genesis,
-    # construct_minable_summary,
+    construct_minable_summary,
     construct_coinbase_transaction,
     construct_pow_evidence,
     get_block_subsidy,
@@ -25,10 +26,27 @@ from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature
 from skepticoin.datatypes import Transaction, OutputReference, Input, Output, Block
 
 
+CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("testdata/chain")
+
 example_public_key = SECP256k1PublicKey(b'x' * 64)
 
 
+def _read_chain_from_disk(max_height):
+    coinstate = CoinState.zero()
+
+    for file_path in sorted(CHAIN_TESTDATA_PATH.iterdir()):
+        height = int(file_path.name.split("-")[0])
+        if height > max_height:
+            return coinstate
+
+        block = Block.stream_deserialize(open(file_path, 'rb'))
+        coinstate = coinstate.add_block_no_validation(block)
+
+    return coinstate
+
+
 def get_example_genesis_block():
+    # an example (valid) genesis block, but not the one from the actual Skepticoin blockchain.
     return Block.deserialize(computer(
         """000000000000000000000000000000000000000000000000000000000000000000008278968af4bd613aa24a5ccd5280211b3101e3"""
         """ff62621bb11500509d1bbe2a956046240b0100000000000000000000000000000000000000000000000000000000000000000000d7"""
@@ -39,7 +57,7 @@ def get_example_genesis_block():
         """787878"""))
 
 
-def test_construct_minable_summary_no_transactions():
+def test_construct_minable_summary():
     summary = construct_minable_summary_genesis([
         construct_coinbase_transaction(0, [], immutables.Map(), b"Political statement goes here", example_public_key)
     ], 1231006505, 0)
@@ -48,17 +66,8 @@ def test_construct_minable_summary_no_transactions():
     # so far... just checking that this doesn't crash :-)
 
 
-def test_construct_minable_summary_with_transactions():
-    # TODO
-    '''
-    coinstate = CoinState.empty()
-    construct_minable_summary(coinstate, [
-        construct_coinbase_transaction(0, [], immutables.Map(), b"Political statement goes here", example_public_key)
-    ], 1231006505, 0)
-    '''
-
-
 def test_construct_pow_evidence_genesis_block():
+    # separate from test_construct_pow_evidence_block_6, because genesis block has no chain sampling (there is no chain)
     coinstate = CoinState.empty()
 
     transactions = [
@@ -72,9 +81,18 @@ def test_construct_pow_evidence_genesis_block():
     # no assertions here, just checking that this doesn't crash :-)
 
 
-def test_construct_pow_evidence_blahblahblabl():
-    # TODO
-    pass
+def test_construct_pow_evidence_non_genesis_block():
+    coinstate = _read_chain_from_disk(5)
+
+    transactions = [
+        construct_coinbase_transaction(0, [], immutables.Map(), b"Political statement goes here", example_public_key),
+    ]
+
+    summary = construct_minable_summary(coinstate, transactions, 1231006505, 0)
+
+    evidence = construct_pow_evidence(coinstate, summary, coinstate.head().height + 1, transactions)
+    evidence.serialize()
+    # no assertions here, just checking that this doesn't crash :-)
 
 
 def test_validate_non_coinbase_transaction_by_itself_no_inputs():
@@ -186,8 +204,8 @@ def test_validate_coinbase_transaction_by_itself_maximum_coinbasedata_size():
         validate_coinbase_transaction_by_itself(cb)
 
 
-def test_validate_block_header_by_itself_for_correct_header():
-    validate_block_header_by_itself(get_example_genesis_block().header, 1615209942)
+def test_validate_block_header_by_itself_no_errors():
+    validate_block_header_by_itself(get_example_genesis_block().header, current_timestamp=1615209942)
 
 
 def test_validate_block_header_by_itself_for_bad_pow():
