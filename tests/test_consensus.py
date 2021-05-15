@@ -4,9 +4,17 @@ import pytest
 from pathlib import Path
 
 from skepticoin.humans import computer
-from skepticoin.params import SASHIMI_PER_COIN, MAX_COINBASE_RANDOM_DATA_SIZE
+from skepticoin.params import (
+    DESIRED_TARGET_READJUSTMENT_TIMESPAN,
+    INITIAL_TARGET,
+    MAX_COINBASE_RANDOM_DATA_SIZE,
+    SASHIMI_PER_COIN,
+)
 from skepticoin.coinstate import CoinState
 from skepticoin.consensus import (
+    calculate_new_target,
+    construct_block_for_mining,
+    construct_block_for_mining_genesis,
     construct_minable_summary_genesis,
     construct_minable_summary,
     construct_coinbase_transaction,
@@ -25,7 +33,7 @@ from skepticoin.consensus import (
     ValidatePOWError,
 )
 from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature, SignableEquivalent
-from skepticoin.datatypes import Transaction, OutputReference, Input, Output, Block
+from skepticoin.datatypes import Transaction, OutputReference, Input, Output, Block, BlockHeader
 
 
 CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("testdata/chain")
@@ -57,6 +65,13 @@ def get_example_genesis_block():
         """000000000000000000000000000000000000000000000000000000000001000000000001000000012a05f200027878787878787878"""
         """7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878"""
         """787878"""))
+
+
+def test_calculate_new_target():
+    assert calculate_new_target(INITIAL_TARGET, DESIRED_TARGET_READJUSTMENT_TIMESPAN)[:4] == b'\x01\x00\x00\x00'
+
+    assert calculate_new_target(INITIAL_TARGET, DESIRED_TARGET_READJUSTMENT_TIMESPAN * 2)[:4] == b'\x02\x00\x00\x00'
+    assert calculate_new_target(INITIAL_TARGET, DESIRED_TARGET_READJUSTMENT_TIMESPAN // 2)[:4] == b'\x00\x80\x00\x00'
 
 
 def test_construct_minable_summary():
@@ -95,6 +110,43 @@ def test_construct_pow_evidence_non_genesis_block():
     evidence = construct_pow_evidence(coinstate, summary, coinstate.head().height + 1, transactions)
     evidence.serialize()
     # no assertions here, just checking that this doesn't crash :-)
+
+
+def test_construct_block_for_mining_no_non_coinbase_transactions():
+    coinstate = _read_chain_from_disk(5)
+
+    block = construct_block_for_mining(
+        coinstate, [], example_public_key, 1231006505, b'skepticoin is digital bitcoin', 1234)
+
+    assert 6 == block.height
+    assert 1 == len(block.transactions)
+    assert example_public_key == block.transactions[0].outputs[0].public_key
+    assert 1231006505 == block.timestamp
+    assert b'skepticoin is digital bitcoin' == block.transactions[0].inputs[0].signature.signature
+    assert 1234 == block.nonce
+
+
+def test_construct_block_for_mining_with_non_coinbase_transactions():
+    coinstate = _read_chain_from_disk(5)
+
+    transactions = [Transaction(
+        inputs=[Input(
+            OutputReference(coinstate.at_head.block_by_height[0].transactions[0].hash(), 0),
+            SECP256k1Signature(b'y' * 64),
+        )],
+        outputs=[Output(9 * SASHIMI_PER_COIN, example_public_key)],
+    )]
+
+    block = construct_block_for_mining(
+        coinstate, transactions, example_public_key, 1231006505, b'skepticoin is digital bitcoin', 1234)
+
+    assert 6 == block.height
+    assert 2 == len(block.transactions)
+    assert 11 * SASHIMI_PER_COIN == block.transactions[0].outputs[0].value  # 10 mined + 1 fee
+    assert example_public_key == block.transactions[0].outputs[0].public_key
+    assert 1231006505 == block.timestamp
+    assert b'skepticoin is digital bitcoin' == block.transactions[0].inputs[0].signature.signature
+    assert 1234 == block.nonce
 
 
 def test_validate_non_coinbase_transaction_by_itself_no_inputs():
@@ -172,7 +224,7 @@ def test_validate_non_coinbase_transaction_by_itself_is_not_coinbase():
         validate_non_coinbase_transaction_by_itself(transaction)
 
 
-def test_validate_non_coinbase_transaction_by_itself_():
+def test_validate_non_coinbase_transaction_by_itself():
     transaction = Transaction(
         inputs=[Input(
             OutputReference(b'a' * 32, 1),
@@ -212,7 +264,7 @@ def test_get_transaction_fee():
 
 
 def test_get_block_fees():
-    pass  # TODO make a test for this once no longer trivial (i.e. when spending from the same block is allowed)
+    pass  # TODO
 
 
 def test_get_block_subsidy():
@@ -291,9 +343,51 @@ def test_validate_block_by_itself_for_correct_block():
     validate_block_by_itself(get_example_genesis_block(), 1615209942)
 
 
-def test_validate_block_by_itself():
-    # TODO we haven't tested actual failures yet.
-    pass  # TODO  should probably be split into multiple tests
+def test_validate_block_by_itself_no_transactions():
+    block = get_example_genesis_block()
+    block.transactions = []
+
+    with pytest.raises(ValidateBlockError, match=".*No transactions.*"):
+        validate_block_by_itself(block, 1615209942)
+
+
+def test_validate_block_by_itself_max_block_size(mocker):
+    # work around get_block_fees... because we would need a coinstate w/ 50_000 unspent outputs to make it work.
+    mocker.patch("skepticoin.consensus.get_block_fees", return_value=0)
+
+    transactions = [
+        Transaction(
+            inputs=[Input(
+                OutputReference(i.to_bytes(32, 'big'), 1),
+                SECP256k1Signature(b'y' * 64),
+            )],
+            outputs=[Output(1, example_public_key)]
+        ) for i in range(50_000)
+    ]
+
+    block = construct_block_for_mining_genesis(transactions, example_public_key, 1231006505, b'', 22)
+
+    with pytest.raises(ValidateBlockError, match=".*MAX_BLOCK_SIZE.*"):
+        validate_block_by_itself(block, 1615209942)
+
+
+def test_validate_block_by_itself_invalid_coinbase_transaction():
+    coinstate = CoinState.empty()
+
+    transactions = [Transaction(
+        inputs=[Input(
+            OutputReference(b'x' * 32, 1),
+            SECP256k1Signature(b'y' * 64),
+        )],
+        outputs=[Output(1, example_public_key)]
+    )]
+
+    summary = construct_minable_summary(coinstate, transactions, 1615209942, 39)
+    evidence = construct_pow_evidence(coinstate, summary, 0, transactions)
+    block = Block(BlockHeader(summary, evidence), transactions)
+
+    with pytest.raises(ValidateTransactionError, match=".*thin air.*"):
+        validate_block_by_itself(block, 1615209942)
 
 
 def test_validate_block_by_itself_for_mismatched_heights():
@@ -302,6 +396,22 @@ def test_validate_block_by_itself_for_mismatched_heights():
 
     with pytest.raises(ValidateBlockError, match=".*height.*"):
         validate_block_by_itself(block, 1615209942)
+
+
+def test_validate_block_by_itself_invalid_non_coinbase_transaction():
+    pass
+
+
+def test_validate_block_by_itself_no_duplicate_transactions():
+    pass
+
+
+def test_validate_block_by_itself_no_duplicate_output_references():
+    pass
+
+
+def test_validate_block_by_itself_incorrect_merkle_root_hash():
+    pass
 
 
 def test_validate_non_coinbase_transaction_in_coinstate_invalid_output_reference():
