@@ -1,4 +1,3 @@
-from os import sync
 import os
 from pathlib import Path
 from decimal import Decimal
@@ -8,7 +7,6 @@ from skepticoin.datatypes import Block
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
 from typing import Any, Dict
-from skepticoin.networking.messages import Message
 
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.consensus import construct_block_for_mining
@@ -16,9 +14,8 @@ from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.utils import block_filename
 from skepticoin.cheating import MAX_KNOWN_HASH_HEIGHT
-from time import time, sleep
+from time import time
 from multiprocessing import Process, Lock, Queue, synchronize
-import queue
 from .utils import (
     initialize_peers_file,
     create_chain_dir,
@@ -182,7 +179,8 @@ def main() -> None:
                 # delete old hashing stats
                 for ts, miner_stats in list(hash_stats.items()):
                     if ts < current_time and len(miner_stats) < args.n:
-                        print(f"WARNING: Only got stats from {len(miner_stats)} of {args.n} processes at timestamp {timestamp}.")
+                        print(f"WARNING: Only got stats from {len(miner_stats)} "
+                              f"of {args.n} processes at timestamp {timestamp}.")
                         del hash_stats[ts]
 
                 if len(hash_stats[timestamp]) == args.n:
