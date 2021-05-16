@@ -70,7 +70,11 @@ def read_chain_from_disk():
         if height % 1000 == 0:
             print(filename)
 
-        block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
+        try:
+            block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
+        except Exception as e:
+            raise Exception("Corrupted block on disk: %s" % filename) from e
+
         coinstate = coinstate.add_block_no_validation(block)
 
     return coinstate
