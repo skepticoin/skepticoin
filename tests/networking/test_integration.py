@@ -184,6 +184,12 @@ def test_broadcast_message_closed_connection_handling(caplog, mocker):
         for remote_peer in thread_a.local_peer.network_manager.get_active_peers():
             remote_peer.sock.close()
 
+        # the tests were failing intermittendly (in the sense that no log records were recorded); adding a sleep(1) here
+        # seems to have fixed the problem, presumably because something in our stack gets the time to "properly break",
+        # such that the log then gets captured when the breakage is dealt with. A solution that doesn't required sleep()
+        # would be preferred though.
+        sleep(1)
+
         # broadcast a message
         thread_a.local_peer.network_manager.broadcast_message(InventoryMessage([]))
 
