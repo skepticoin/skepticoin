@@ -219,4 +219,4 @@ Transaction | ...
 """)
 
 
-build_explorer(get_coinstate())
+build_explorer(get_coinstate())  # noqa F821  (get_coinstate is a globally available variable in skepticoin-run)
