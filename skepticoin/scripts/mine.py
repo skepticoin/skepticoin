@@ -4,9 +4,10 @@ from pathlib import Path
 from decimal import Decimal
 from datetime import datetime
 import random
+from skepticoin.datatypes import Block
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
-from typing import Any
+from typing import Any, Dict
 from skepticoin.networking.messages import Message
 
 from skepticoin.params import SASHIMI_PER_COIN
@@ -70,66 +71,75 @@ class Miner:
             self.send_message("info", "Your blockchain is not just old, it is ancient; ABORTING")
             os.exit(0)
 
+    def get_key_for_mined_block(self) -> bytes:
+        self.wallet_lock.acquire()
+        public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
+        save_wallet(self.wallet)
+        self.wallet_lock.release()
+        return public_key
+
+    def get_balance(self) -> float:
+        self.wallet_lock.acquire()
+        balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
+        self.wallet_lock.release()
+        return balance
+
+    def handle_mined_block(self, block: Block) -> None:
+        self.coinstate = self.coinstate.add_block(block, int(time()))
+        with open(Path('chain') / block_filename(block), 'wb') as f:
+            f.write(block.serialize())
+
+        self.send_message("found_block", block_filename(block))
+        self.send_message("balance", self.get_balance())
+
+        self.thread.local_peer.chain_manager.set_coinstate(self.coinstate)
+        self.thread.local_peer.network_manager.broadcast_block(block)
+
     def __call__(self) -> None:
         self.prepare()
-
-        start_time = datetime.now()
-        start_balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
-        balance = start_balance
-        self.send_message("info", f"Wallet balance: {start_balance} skepticoin")
+        self.send_message("start_balance", self.get_balance())
         self.send_message("info", "Starting mining: A repeat minter")
 
         try:
-            self.send_message("info", "Starting main loop")
+            public_key = self.get_key_for_mined_block()
+            nonce = random.randrange(1 << 32)
+            last_round_second = int(time())
+            hashes = 0
 
             while True:
-                self.wallet_lock.acquire()
-                public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
-                save_wallet(self.wallet)
-                self.wallet_lock.release()
+                current_second = int(time())
 
-                nonce = random.randrange(1 << 32)
-                last_round_second = int(time())
-                hashes = 0
+                if current_second > last_round_second:
+                    self.send_message("hashes", (current_second, hashes))
+                    last_round_second = current_second
+                    hashes = 0
 
-                while True:
-                    current_second = int(time())
-                    if current_second > last_round_second:
-                        self.send_message("hashes", (current_second, hashes))
-                        last_round_second = current_second
-                        hashes = 0
+                self.coinstate, transactions = self.thread.local_peer.chain_manager.get_state()
+                increasing_time = max(current_second, self.coinstate.head().timestamp + 1)
 
-                    coinstate, transactions = self.thread.local_peer.chain_manager.get_state()
-                    increasing_time = max(int(time()), coinstate.head().timestamp + 1)
-                    block = construct_block_for_mining(
-                        coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
+                block = construct_block_for_mining(
+                    self.coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
 
-                    hashes += 1
-                    nonce = (nonce + 1) % (1 << 32)
-                    if block.hash() < block.target:
-                        break
+                hashes += 1
+                nonce = (nonce + 1) % (1 << 32)
 
-                coinstate = coinstate.add_block(block, int(time()))
-                with open(Path('chain') / block_filename(block), 'wb') as f:
-                    f.write(block.serialize())
+                if block.hash() < block.target:
+                    self.handle_mined_block(block)
 
-                self.send_message("found_block", block_filename(block))
-                self.wallet_lock.acquire()
-                balance = (self.wallet.get_balance(coinstate) / Decimal(SASHIMI_PER_COIN))
-                self.wallet_lock.release()
-                self.send_message("info", f"Wallet balance: {balance} skepticoin")
-
-                self.thread.local_peer.chain_manager.set_coinstate(coinstate)
-                self.thread.local_peer.network_manager.broadcast_block(block)
+                    # get key for next mined block
+                    public_key = self.get_key_for_mined_block()
 
         except KeyboardInterrupt:
-            print("KeyboardInterrupt")
+            self.send_message("info", "KeyboardInterrupt")
+
         finally:
-            print("Stopping networking thread")
+            self.send_message("info", "Stopping networking thread")
             self.thread.stop()
-            print("Waiting for networking thread to stop")
+
+            self.send_message("info", "Waiting for networking thread to stop")
             self.thread.join()
-            print("Done; waiting for Python-exit")
+
+            self.send_message("info", "Done; waiting for Python-exit")
 
 
 def main() -> None:
@@ -149,10 +159,9 @@ def main() -> None:
         process.start()
         processes.append(process)
 
-    hash_stats = {}
+    hash_stats: Dict[int, Dict[int, int]] = {}
     start_time = datetime.now()
 
-    # TODO
     balance = 0
     start_balance = 0
 
@@ -168,9 +177,13 @@ def main() -> None:
 
                 hash_stats[timestamp][miner_id] = hashes
 
-                # TODO make sure we empty this map periodically
+                current_time = int(time())
 
-                # TODO this doesn't print if a miner didn't report
+                # delete old hashing stats
+                for ts, miner_stats in list(hash_stats.items()):
+                    if ts < current_time and len(miner_stats) < args.n:
+                        print(f"WARNING: Only got stats from {len(miner_stats)} of {args.n} processes at timestamp {timestamp}.")
+                        del hash_stats[ts]
 
                 if len(hash_stats[timestamp]) == args.n:
                     now = datetime.now()
@@ -180,13 +193,27 @@ def main() -> None:
 
                     mined = balance - start_balance
                     total_hashes = sum(hash_stats[timestamp].values())
+                    del hash_stats[timestamp]
 
                     mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
                     print(f"{now_str} | uptime: {uptime_str} | {total_hashes:>3} hash/sec" +
                           f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
 
+            elif message_type == "balance":
+                balance = data
+
+            elif message_type == "start_balance":
+                start_balance = data
+                balance = data
+
+            elif message_type == "found_block":
+                print(f"miner {miner_id:2} found block: {data}")
+
+            elif message_type == "info":
+                print(f"miner {miner_id:2}: {data}")
+
             else:
-                print(f"queue item: {miner_id} {message_type} {data}")
+                print(f"unhandled message_type {message_type} from {miner_id}, data={data}")
 
     except KeyboardInterrupt:
         pass
