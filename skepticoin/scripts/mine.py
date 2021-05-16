@@ -28,16 +28,16 @@ from .utils import (
 )
 
 
-def run_miner(args: Any, wallet_lock: synchronize.Lock, q: Queue, miner_id: int) -> None:
-    miner = Miner(args, wallet_lock, q, miner_id)
+def run_miner(args: Any, wallet_lock: synchronize.Lock, queue: Queue, miner_id: int) -> None:
+    miner = Miner(args, wallet_lock, queue, miner_id)
     miner()
 
 
 class Miner:
-    def __init__(self, args: Any, wallet_lock: synchronize.Lock, q: Queue, miner_id: int) -> None:
+    def __init__(self, args: Any, wallet_lock: synchronize.Lock, queue: Queue, miner_id: int) -> None:
         self.args = args
         self.wallet_lock = wallet_lock
-        self.q = q
+        self.queue = queue
         self.miner_id = miner_id
         self.wallet: Wallet
         self.coinstate: CoinState
@@ -45,7 +45,7 @@ class Miner:
 
     def send_message(self, message_type: str, data: Any) -> None:
         message = (self.miner_id, message_type, data)
-        self.q.put(message)
+        self.queue.put(message)
 
     def prepare(self):
         configure_logging_from_args(self.args)
@@ -75,7 +75,7 @@ class Miner:
         self.wallet_lock.release()
         return public_key
 
-    def get_balance(self) -> float:
+    def get_balance(self) -> Decimal:
         self.wallet_lock.acquire()
         balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
         self.wallet_lock.release()
@@ -122,8 +122,6 @@ class Miner:
 
                 if block.hash() < block.target:
                     self.handle_mined_block(block)
-
-                    # get key for next mined block
                     public_key = self.get_key_for_mined_block()
 
         except KeyboardInterrupt:
@@ -144,7 +142,7 @@ def main() -> None:
     parser.add_argument('-n', default=1, type=int, help='number of miner instances')
     args = parser.parse_args()
 
-    q = Queue()
+    queue = Queue()
     wallet_lock = Lock()
     processes = []
 
@@ -152,7 +150,7 @@ def main() -> None:
         if i > 0:
             args.dont_listen = True
 
-        process = Process(target=run_miner, daemon=True, args=(args, wallet_lock, q, i))
+        process = Process(target=run_miner, daemon=True, args=(args, wallet_lock, queue, i))
         process.start()
         processes.append(process)
 
@@ -164,7 +162,7 @@ def main() -> None:
 
     try:
         while True:
-            miner_id, message_type, data = q.get()
+            miner_id, message_type, data = queue.get()
 
             if message_type == "hashes":
                 timestamp, hashes = data
