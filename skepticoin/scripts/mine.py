@@ -5,7 +5,7 @@ import random
 from skepticoin.datatypes import Block
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.consensus import construct_block_for_mining
@@ -136,82 +136,98 @@ class Miner:
             self.send_message("info", "Done; waiting for Python-exit")
 
 
+class MinerWatcher:
+    def __init__(self) -> None:
+        parser = DefaultArgumentParser()
+        parser.add_argument('-n', default=1, type=int, help='number of miner instances')
+        self.args = parser.parse_args()
+
+        self.queue: Queue = Queue()
+        self.wallet_lock: synchronize.Lock = Lock()
+        self.processes: List[Process] = []
+
+        self.hash_stats: Dict[int, Dict[int, int]] = {}
+        self.balance: Decimal = Decimal(0)
+        self.start_balance: Decimal = Decimal(0)
+        self.start_time: datetime
+
+    def __call__(self) -> None:
+        for i in range(self.args.n):
+            if i > 0:
+                self.args.dont_listen = True
+
+            process = Process(target=run_miner, daemon=True, args=(self.args, self.wallet_lock, self.queue, i))
+            process.start()
+            self.processes.append(process)
+
+        self.start_time = datetime.now()
+
+        try:
+            while True:
+                queue_item: Tuple[str, int, Any] = self.queue.get()
+                self.handle_message(queue_item)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            for process in self.processes:
+                process.join()
+
+    def get_stats_line(self, timestamp) -> str:
+        now = datetime.now()
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        uptime = now - self.start_time
+        uptime_str = str(uptime).split(".")[0]
+
+        mined = self.balance - self.start_balance
+        total_hashes = sum(self.hash_stats[timestamp].values())
+        del self.hash_stats[timestamp]
+
+        mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
+        return (f"{now_str} | uptime: {uptime_str} | {total_hashes:>3} hash/sec" +
+                f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
+
+    def handle_message(self, queue_item: Tuple[str, int, Any]) -> None:
+        miner_id, message_type, data = queue_item
+
+        if message_type == "hashes":
+            timestamp, hashes = data
+
+            if timestamp not in self.hash_stats:
+                self.hash_stats[timestamp] = {}
+
+            self.hash_stats[timestamp][miner_id] = hashes
+
+            current_time = int(time())
+
+            # delete old hashing stats
+            for ts, miner_stats in list(self.hash_stats.items()):
+                if ts < current_time and len(miner_stats) < self.args.n:
+                    timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                    print(f"{timestamp_str} | WARNING: Only got stats from" +
+                          f"{len(miner_stats)} of {self.args.n} miners")
+                    print(self.get_stats_line(ts))
+                    del self.hash_stats[ts]
+
+            if len(self.hash_stats[timestamp]) == self.args.n:
+                print(self.get_stats_line(timestamp))
+
+        elif message_type == "balance":
+            self.balance = data
+
+        elif message_type == "start_balance":
+            self.start_balance = data
+            self.balance = data
+
+        elif message_type == "found_block":
+            print(f"miner {miner_id:2} found block: {data}")
+
+        elif message_type == "info":
+            print(f"miner {miner_id:2}: {data}")
+
+        else:
+            print(f"unhandled message_type {message_type} from {miner_id}, data={data}")
+
+
 def main() -> None:
-    parser = DefaultArgumentParser()
-    parser.add_argument('-n', default=1, type=int, help='number of miner instances')
-    args = parser.parse_args()
-
-    queue: Queue = Queue()
-    wallet_lock = Lock()
-    processes = []
-
-    for i in range(args.n):
-        if i > 0:
-            args.dont_listen = True
-
-        process = Process(target=run_miner, daemon=True, args=(args, wallet_lock, queue, i))
-        process.start()
-        processes.append(process)
-
-    hash_stats: Dict[int, Dict[int, int]] = {}
-    start_time = datetime.now()
-
-    balance = 0
-    start_balance = 0
-
-    try:
-        while True:
-            miner_id, message_type, data = queue.get()
-
-            if message_type == "hashes":
-                timestamp, hashes = data
-
-                if timestamp not in hash_stats:
-                    hash_stats[timestamp] = {}
-
-                hash_stats[timestamp][miner_id] = hashes
-
-                current_time = int(time())
-
-                # delete old hashing stats
-                for ts, miner_stats in list(hash_stats.items()):
-                    if ts < current_time and len(miner_stats) < args.n:
-                        print(f"WARNING: Only got stats from {len(miner_stats)} "
-                              f"of {args.n} processes at timestamp {timestamp}.")
-                        del hash_stats[ts]
-
-                if len(hash_stats[timestamp]) == args.n:
-                    now = datetime.now()
-                    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-                    uptime = now - start_time
-                    uptime_str = str(uptime).split(".")[0]
-
-                    mined = balance - start_balance
-                    total_hashes = sum(hash_stats[timestamp].values())
-                    del hash_stats[timestamp]
-
-                    mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
-                    print(f"{now_str} | uptime: {uptime_str} | {total_hashes:>3} hash/sec" +
-                          f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
-
-            elif message_type == "balance":
-                balance = data
-
-            elif message_type == "start_balance":
-                start_balance = data
-                balance = data
-
-            elif message_type == "found_block":
-                print(f"miner {miner_id:2} found block: {data}")
-
-            elif message_type == "info":
-                print(f"miner {miner_id:2}: {data}")
-
-            else:
-                print(f"unhandled message_type {message_type} from {miner_id}, data={data}")
-
-    except KeyboardInterrupt:
-        pass
-    finally:
-        for process in processes:
-            process.join()
+    miner_watcher = MinerWatcher()
+    miner_watcher()
