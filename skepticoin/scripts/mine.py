@@ -164,7 +164,7 @@ class MinerWatcher:
 
         try:
             while True:
-                queue_item: Tuple[str, int, Any] = self.queue.get()
+                queue_item: Tuple[int, str, Any] = self.queue.get()
                 self.handle_message(queue_item)
         except KeyboardInterrupt:
             pass
@@ -172,44 +172,54 @@ class MinerWatcher:
             for process in self.processes:
                 process.join()
 
-    def get_stats_line(self, timestamp) -> str:
+    def get_stats_line(self, timestamp: int) -> str:
+
         now = datetime.now()
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
         uptime = now - self.start_time
         uptime_str = str(uptime).split(".")[0]
 
         mined = self.balance - self.start_balance
         total_hashes = sum(self.hash_stats[timestamp].values())
-        del self.hash_stats[timestamp]
 
         mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
         return (f"{now_str} | uptime: {uptime_str} | {total_hashes:>3} hash/sec" +
                 f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
 
-    def handle_message(self, queue_item: Tuple[str, int, Any]) -> None:
+    def cleanup_old_hash_stats(self) -> None:
+        current_time = int(time())
+
+        for timestamp, stats_per_timestamp in sorted(list(self.hash_stats.items())):
+            count = len(stats_per_timestamp)
+
+            if timestamp < current_time and count < self.args.n:
+                timestamp_str = datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                print(f"{timestamp_str} | WARNING: Only got stats from {count} of {self.args.n} miners")
+
+                # print old stats line: incomplete stats are better than no stats
+                print(self.get_stats_line(timestamp))
+                del self.hash_stats[timestamp]
+
+    def handle_message(self, queue_item: Tuple[int, str, Any]) -> None:
         miner_id, message_type, data = queue_item
 
         if message_type == "hashes":
-            timestamp, hashes = data
+            timestamp: int
+            hash_count: int
+
+            timestamp, hash_count = data
 
             if timestamp not in self.hash_stats:
                 self.hash_stats[timestamp] = {}
 
-            self.hash_stats[timestamp][miner_id] = hashes
+            self.hash_stats[timestamp][miner_id] = hash_count
 
-            current_time = int(time())
-
-            # delete old hashing stats
-            for ts, miner_stats in list(self.hash_stats.items()):
-                if ts < current_time and len(miner_stats) < self.args.n:
-                    timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                    print(f"{timestamp_str} | WARNING: Only got stats from" +
-                          f"{len(miner_stats)} of {self.args.n} miners")
-                    print(self.get_stats_line(ts))
-                    del self.hash_stats[ts]
+            self.cleanup_old_hash_stats()
 
             if len(self.hash_stats[timestamp]) == self.args.n:
                 print(self.get_stats_line(timestamp))
+                del self.hash_stats[timestamp]
 
         elif message_type == "balance":
             self.balance = data
