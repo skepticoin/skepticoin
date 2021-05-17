@@ -1,3 +1,5 @@
+from io import BytesIO
+import zipfile
 import sys
 import urllib.request
 from pathlib import Path
@@ -36,8 +38,14 @@ def initialize_peers_file():
 
 def create_chain_dir():
     if not os.path.exists('chain'):
+        print("Pre-download blockchain from trusted source to 'blockchain-master'")
+        with urllib.request.urlopen("https://github.com/skepticoin/blockchain/archive/refs/heads/master.zip") as resp:
+            with zipfile.ZipFile(BytesIO(resp.read())) as zip_ref:
+                print("Extracting...")
+                zip_ref.extractall()
+
         print("Created new directory for chain")
-        os.makedirs('chain')
+        os.rename('blockchain-master', 'chain')
 
 
 def check_for_fresh_chain(thread):
