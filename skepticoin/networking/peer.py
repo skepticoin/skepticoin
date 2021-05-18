@@ -140,9 +140,16 @@ class NetworkManager(Manager):
             try:
                 # try/except b/c .send_message might try to set the selector for a just-closed sock to writing
                 peer.send_message(message)
-            except (OSError, ValueError, KeyError) as e:
+            except (ValueError, KeyError) as e:
+                # ValueError, KeyError seen in the wild for selector problems; should be more exactly matched though.
+                # The traceback that's printed below will help in this matching effort.
+
+                self.local_peer.logger.info("%15s ChainManager.broadcast_message error %s" % (peer.host, e))
+                if "ValueError: Invalid file descriptor: " not in str(e):
+                    self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
+
+            except (OSError) as e:
                 # OSError: e.g. ConnectionRefusedError, "Bad file descriptor"
-                # ValueError, KeyError seen in the wild for selector problems; should be more exactly matched though
                 self.local_peer.logger.info("%15s ChainManager.broadcast_message error %s" % (peer.host, e))
 
 
@@ -786,16 +793,13 @@ class LocalPeer:
             self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
             self.disconnect(remote_peer, "OS error")
 
-        except ValueError as e:  # e.g. Invalid file descriptor: {}".format(fd)) ... more exact matching is better tho
-            # no print-to-screen for this one
-            self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
-            self.disconnect(remote_peer, "OS error")
-
         except Exception as e:
             # We take the position that any exception caused is reason to disconnect. This allows the code that talks to
             # peers to not have special cases for exceptions since they will all be caught by this catch-all.
             self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
-            self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
+
+            if "ValueError: Invalid file descriptor: " not in str(e):
+                self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
 
             self.disconnect(remote_peer, "Exception")
 
