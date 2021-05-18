@@ -79,7 +79,8 @@ def read_chain_from_disk():
             print(filename)
 
         try:
-            block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
+            with open(Path("chain") / filename, 'rb') as f:
+                block = Block.stream_deserialize(f)
         except Exception as e:
             raise Exception("Corrupted block on disk: %s" % filename) from e
 
