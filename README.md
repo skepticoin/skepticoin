@@ -120,6 +120,13 @@ If you have ethical objections against this, you can always go to the
 
 **A:** [No](https://github.com/skepticoin/skepticoin/blob/master/docs/security.md)
 
+##
+
+**Q:** Is this some kind of get rich quick scheme?
+
+**A:** If you're asking you're probably looking for one. If you're buying skepticoin in the hope that some greater fool
+       will buy them from you at a higher price, just know that, on average, it's likely that you're the greatest fool.
+
 ## Commonly raised objections
 
 **O:** I can't buy skepticoin at an exchange -- this means it's not a "real" coin!
@@ -160,3 +167,5 @@ Some ways you can contribute to this project:
 * Spread the news. ([Remember the first principle](https://github.com/skepticoin/skepticoin/blob/master/docs/philosophy/principles.md))
 * [Set up port forwarding on your router](https://github.com/skepticoin/skepticoin/blob/master/docs/port-forwarding.md)
 * [File a bug](https://github.com/skepticoin/skepticoin/issues/new) if you have one
+* Open a PR (but make sure to read
+  [CONTRIBUTING.md](https://github.com/skepticoin/skepticoin/blob/master/CONTRIBUTING.md) first

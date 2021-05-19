@@ -4,6 +4,10 @@ from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import save_wallet
 from skepticoin.wallet import is_valid_address, parse_address, create_spend_transaction
+from skepticoin.consensus import (
+    validate_non_coinbase_transaction_by_itself,
+    validate_non_coinbase_transaction_in_coinstate,
+)
 
 from .utils import (
     initialize_peers_file,
@@ -55,6 +59,10 @@ def main() -> None:
             target_address,
             change_address,
         )
+
+        validate_non_coinbase_transaction_by_itself(transaction)
+        assert coinstate.current_chain_hash
+        validate_non_coinbase_transaction_in_coinstate(transaction, coinstate.current_chain_hash, coinstate)
 
         print("Broadcasting transaction on the network", transaction)
         thread.local_peer.network_manager.broadcast_transaction(transaction)

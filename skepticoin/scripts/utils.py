@@ -1,3 +1,5 @@
+from io import BytesIO
+import zipfile
 import sys
 import urllib.request
 from pathlib import Path
@@ -34,9 +36,15 @@ def initialize_peers_file() -> None:
 
 
 def create_chain_dir() -> None:
-    if not os.path.exists("chain"):
+    if not os.path.exists('chain'):
+        print("Pre-download blockchain from trusted source to 'blockchain-master'")
+        with urllib.request.urlopen("https://github.com/skepticoin/blockchain/archive/refs/heads/master.zip") as resp:
+            with zipfile.ZipFile(BytesIO(resp.read())) as zip_ref:
+                print("Extracting...")
+                zip_ref.extractall()
+
         print("Created new directory for chain")
-        os.makedirs('chain')
+        os.rename('blockchain-master', 'chain')
 
 
 def check_for_fresh_chain(thread: NetworkingThread) -> bool:
@@ -69,7 +77,12 @@ def read_chain_from_disk() -> CoinState:
         if height % 1000 == 0:
             print(filename)
 
-        block = Block.stream_deserialize(open(Path('chain') / filename, 'rb'))
+        try:
+            with open(Path("chain") / filename, 'rb') as f:
+                block = Block.stream_deserialize(f)
+        except Exception as e:
+            raise Exception("Corrupted block on disk: %s" % filename) from e
+
         coinstate = coinstate.add_block_no_validation(block)
 
     return coinstate

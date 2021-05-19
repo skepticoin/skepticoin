@@ -4,16 +4,16 @@
 from decimal import Decimal
 from datetime import datetime, timezone
 import os
+from typing import Callable
 import immutables
 from collections import namedtuple
 from pathlib import Path
 
 from skepticoin.coinstate import CoinState, PKBalance
 from skepticoin.signing import PublicKey
-
-from .datatypes import Block, Output, OutputReference, Transaction
-from .humans import human
-from .params import SASHIMI_PER_COIN
+from skepticoin.datatypes import Block, Output, OutputReference, Transaction
+from skepticoin.humans import human
+from skepticoin.params import SASHIMI_PER_COIN
 
 
 PKBalance2 = namedtuple('PKBalance2', [
@@ -117,10 +117,7 @@ def build_pkb2(coinstate: CoinState) -> immutables.Map[PublicKey, PKBalance]:
 
 
 def build_explorer(coinstate: CoinState) -> None:
-    if not os.path.exists("explorer"):
-        print("Created new directory for explorer")
-        os.makedirs('explorer')
-
+    explorer_dir = Path(os.environ["EXPLORER_DIR"])
     public_key_balances_2 = immutables.Map()
 
     for height in range(coinstate.head().height + 1):
@@ -136,7 +133,7 @@ def build_explorer(coinstate: CoinState) -> None:
         unspent_transaction_outs = get_unspent_transaction_outs_before_block(coinstate, block)
         public_key_balances_2 = build_pkb2_block(coinstate, block, public_key_balances_2)
 
-        with open(Path("explorer") / (human(block.hash()) + '.md'), 'w') as block_f:
+        with open(explorer_dir / (human(block.hash()) + '.md'), 'w') as block_f:
 
             block_f.write(f"""## Block {human(block.hash())}
 
@@ -162,7 +159,7 @@ Hash | Amount
                 v = show_coin(sum(o.value for o in transaction.outputs))
                 block_f.write(f"""[{h}]({h}.md) | {v} \n""")
 
-                with open(Path("explorer") / (human(transaction.hash()) + ".md"), 'w') as transaction_f:
+                with open(explorer_dir / (human(transaction.hash()) + ".md"), 'w') as transaction_f:
                     transaction_f.write(f"""## Transaction {human(transaction.hash())}
 
 In block [{human(block.hash())}]({human(block.hash())}.md)
@@ -204,7 +201,7 @@ Value | Address
     for pk, pkb2 in public_key_balances_2.items():
         v = show_coin(pkb2.value)
         address = "SKE" + human(pk.public_key) + "PTI"
-        with open(Path("explorer") / (address + ".md"), 'w') as address_f:
+        with open(explorer_dir / (address + ".md"), 'w') as address_f:
             address_f.write(f"""## {address}
 
 Current balance: {v}
@@ -236,3 +233,8 @@ Transaction | ...
 
 -- not spent --
 """)
+
+
+get_coinstate: Callable[..., CoinState]
+
+build_explorer(get_coinstate())  # noqa F821  (get_coinstate is a globally available variable in skepticoin-run)

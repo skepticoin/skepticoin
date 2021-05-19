@@ -42,7 +42,7 @@ def main() -> None:
 
     print("Starting REPL, exit with exit()")
     try:
-        locals = {
+        globals = {
             'thread': thread,
             'local_peer': thread.local_peer,
             'show_stats': thread.local_peer.show_stats,
@@ -53,7 +53,7 @@ def main() -> None:
 
         for module in [skepticoin.datatypes, skepticoin.networking.messages, skepticoin.signing, skepticoin.humans]:
             for attr in module.__all__:
-                locals[attr] = getattr(module, attr)
+                globals[attr] = getattr(module, attr)
 
         def configure(repl: PythonRepl) -> None:
             if os.path.exists(config_file):
@@ -68,7 +68,7 @@ def main() -> None:
 
         embed(
             vi_mode=args.vi_mode,
-            locals=locals,
+            globals=globals,
             configure=configure,
             history_filename=history_file,
             patch_stdout=True,
