@@ -9,5 +9,5 @@ repos:
     rev: 'v0.812'
     hooks:
     -   id: mypy
-        exclude: tests/
+        files: ^skepticoin/
         args: [--strict, --implicit-reexport, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]
