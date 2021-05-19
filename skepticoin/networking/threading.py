@@ -1,4 +1,5 @@
-from threading import Thread  # type: ignore
+from threading import Thread
+from typing import Optional
 
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.params import PORT
@@ -9,7 +10,7 @@ class NetworkingThread(Thread):
     def __init__(
         self,
         coinstate: CoinState,
-        port: int = PORT,
+        port: Optional[int] = PORT,
         disk_interface: DiskInterface = DiskInterface(),
     ):
         super().__init__(name="NetworkingThread")

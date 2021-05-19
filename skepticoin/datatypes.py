@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from io import BytesIO
-from typing import Any, BinaryIO, List, Optional
+from typing import Any, BinaryIO, Callable, List, Optional
 
 from .humans import human
 from .serialization import (
@@ -308,11 +308,24 @@ class Block(Serializable):
         self.header = header
         self.transactions = transactions
 
+    @property
+    def version(self) -> int:
+        return self.header.version
+
+    @property
+    def summary(self) -> BlockSummary:
+        return self.header.summary
+
+    @property
+    def pow_evidence(self) -> PowEvidence:
+        return self.header.pow_evidence
+
+    @property
+    def hash(self) -> Callable[[], bytes]:
+        return self.header.hash
+
     def __getattr__(self, attr: str) -> Any:
         """convenience: merge header and summary's attributes into the Block's accessors"""
-        if attr in ['version', 'summary', 'pow_evidence', 'hash']:
-            return getattr(self.header, attr)
-
         if attr in ['height', 'previous_block_hash', 'merkle_root_hash', 'timestamp', 'target', 'nonce']:
             return getattr(self.header.summary, attr)
 

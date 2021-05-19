@@ -336,6 +336,8 @@ class Peer(Serializable):
         self.last_seen_at = last_seen_at
         self.ip_address = ip_address
         self.port = port
+        self.waiting_for_inventory: bool
+        self.inventory_messages: List[InventoryMessage]
 
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> Peer:
@@ -349,6 +351,9 @@ class Peer(Serializable):
         f.write(struct.pack(b">I", self.last_seen_at))
         f.write(self.ip_address.packed)
         f.write(struct.pack(b">H", self.port))
+
+    def handle_message_received(self, header: MessageHeader, message: Message) -> None:
+        raise NotImplementedError
 
 
 class PeersMessage(Message):
