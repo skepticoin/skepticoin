@@ -12,11 +12,11 @@ from .utils import (
 
 
 class EverythingIsNone:
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> None:
         return None
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument("script_file")
     args = parser.parse_args()
