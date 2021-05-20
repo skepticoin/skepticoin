@@ -10,4 +10,5 @@ repos:
     hooks:
     -   id: mypy
         files: ^skepticoin/
+        language: system
         args: [--strict, --implicit-reexport, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]
