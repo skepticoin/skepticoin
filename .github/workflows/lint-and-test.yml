@@ -34,7 +34,7 @@ jobs:
         flake8 . --show-source --statistics
     - name: Typecheck with mpypy
       run: |
-        mypy . --exclude tests/ --strict --implicit-reexport --allow-subclassing-any --allow-any-generics --ignore-missing-imports
+        mypy skepticoin --strict --implicit-reexport --allow-subclassing-any --allow-any-generics --ignore-missing-imports
     - name: Test with pytest
       run: |
         PYTHONPATH=. pytest --tb=native

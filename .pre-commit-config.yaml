@@ -10,7 +10,8 @@ repos:
     hooks:
     -   id: mypy
         files: ^skepticoin/
-        args: [--strict, --implicit-reexport, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]
+        pass_filenames: false
+        args: [skepticoin, --strict, --implicit-reexport, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]
 -   repo: local
     hooks:
       - id: pytest-check
