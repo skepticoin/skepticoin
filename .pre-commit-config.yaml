@@ -10,5 +10,13 @@ repos:
     hooks:
     -   id: mypy
         files: ^skepticoin/
-        language: system
         args: [--strict, --implicit-reexport, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]
+-   repo: local
+    hooks:
+      - id: pytest-check
+        verbose: true
+        name: pytest-check
+        entry: python -m py.test tests/ -x
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -160,7 +160,7 @@ def construct_pow_evidence(
     else:
 
         def get_block_by_height(h: int) -> Block:
-            return coinstate.block_by_height_by_hash[summary.previous_block_hash][h]
+            return coinstate.block_by_height_by_hash[summary.previous_block_hash][h]  # type: ignore
 
         chain_sample = select_n_k_length_slices_from_chain(
             summary_hash, current_height, get_block_by_height, CHAIN_SAMPLE_COUNT, CHAIN_SAMPLE_SIZE)

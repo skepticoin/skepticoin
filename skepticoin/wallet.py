@@ -81,7 +81,7 @@ class Wallet:
 
     def get_balance(self, coinstate: CoinState) -> int:
         return sum(
-            coinstate.public_key_balances_by_hash[coinstate.current_chain_hash].get(  # type: ignore
+            coinstate.public_key_balances_by_hash[coinstate.current_chain_hash].get(
                 SECP256k1PublicKey(pk), PKBalance(0, [])).value
             for pk in self.keypairs.keys()
         )
