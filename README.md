@@ -30,7 +30,7 @@ believe in.
 The quickstart assumes (for now) that you have Python up and running. _The instructions below are written with
 Linux/POSIX in mind._
 
-* If you're a MacOS user, it is presumed that you have installed python3 yourself somehow (e.g. using pyenv).
+* If you're a MacOS user, it is presumed that you have `python3` installed (either by e.g. using `pyenv`, or using a recent version of macOS).
 * If you're a Windows user, remember to use `Scripts\activate.bat` instead of `.bin/activate`.
 
 ```
