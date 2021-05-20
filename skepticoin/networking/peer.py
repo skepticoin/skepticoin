@@ -169,7 +169,7 @@ class ChainManager(Manager):
     def __init__(self, local_peer: LocalPeer, current_time: int):
         self.local_peer = local_peer
         self.lock = Lock()
-        self.coinstate: Optional[CoinState] = None
+        self.coinstate: CoinState
         self.actively_fetching_blocks_from_peers: List[
             Tuple[int, ConnectedRemotePeer]
         ] = []
