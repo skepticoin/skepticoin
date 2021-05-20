@@ -324,12 +324,29 @@ class Block(Serializable):
     def hash(self) -> Callable[[], bytes]:
         return self.header.hash
 
-    def __getattr__(self, attr: str) -> Any:
-        """convenience: merge header and summary's attributes into the Block's accessors"""
-        if attr in ['height', 'previous_block_hash', 'merkle_root_hash', 'timestamp', 'target', 'nonce']:
-            return getattr(self.header.summary, attr)
+    @property
+    def height(self) -> int:
+        return self.header.summary.height
 
-        raise AttributeError("'Block' object has no attribute '%s'" % attr)
+    @property
+    def previous_block_hash(self) -> bytes:
+        return self.header.summary.previous_block_hash
+
+    @property
+    def merkle_root_hash(self) -> bytes:
+        return self.header.summary.merkle_root_hash
+
+    @property
+    def timestamp(self) -> int:
+        return self.header.summary.timestamp
+
+    @property
+    def target(self) -> bytes:
+        return self.header.summary.target
+
+    @property
+    def nonce(self) -> int:
+        return self.header.summary.nonce
 
     def __repr__(self) -> str:
         return "Block #%s" % human(self.header.hash())
@@ -354,7 +371,7 @@ class Block(Serializable):
 
     def get_total_work(self) -> int:
         # TODO this is totally a placeholder :-D
-        return self.height  # type: ignore
+        return self.height
 
 
 __all__ = [

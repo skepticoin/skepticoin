@@ -45,7 +45,7 @@ def uto_apply_block(
 
 
 def pkb_apply_transaction(
-    unspent_transaction_outs: immutables.Map[OutputReference, OutputReference],
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
     public_key_balances: immutables.Map[PublicKey, PKBalance],
     transaction: Transaction,
     is_coinbase: bool,
@@ -56,7 +56,7 @@ def pkb_apply_transaction(
             for input in transaction.inputs:
                 previously_unspent_output = unspent_transaction_outs[input.output_reference]
 
-                public_key = previously_unspent_output.public_key
+                public_key: PublicKey = previously_unspent_output.public_key
                 mutable_public_key_balances[public_key] = PKBalance(
                     mutable_public_key_balances[public_key].value - previously_unspent_output.value,
                     [to for to in mutable_public_key_balances[public_key].output_references
@@ -78,7 +78,7 @@ def pkb_apply_transaction(
 
 
 def pkb_apply_block(
-    unspent_transaction_outs: immutables.Map[OutputReference, OutputReference],
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
     public_key_balances: immutables.Map[PublicKey, PKBalance],
     block: Block,
 ) -> immutables.Map[PublicKey, PKBalance]:
@@ -97,7 +97,7 @@ def pkb_apply_block(
 class CoinState:
     def __init__(
         self,
-        block_by_hash: immutables.Map[bytes, BlockSummary],
+        block_by_hash: immutables.Map[bytes, Block],
         unspent_transaction_outs_by_hash: immutables.Map[
             bytes, immutables.Map[OutputReference, Output]
         ],
@@ -154,8 +154,8 @@ class CoinState:
 
     def add_block_no_validation(self, block: Block) -> CoinState:
         if block.previous_block_hash == b'\00' * 32:
-            unspent_transaction_outs = immutables.Map()
-            public_key_balances = immutables.Map()
+            unspent_transaction_outs: immutables.Map[OutputReference, Output] = immutables.Map()
+            public_key_balances: immutables.Map[PublicKey, PKBalance] = immutables.Map()
         else:
             unspent_transaction_outs = self.unspent_transaction_outs_by_hash[block.previous_block_hash]
             public_key_balances = self.public_key_balances_by_hash[block.previous_block_hash]
@@ -164,7 +164,7 @@ class CoinState:
         # NOTE: ordering matters b/c we assign to unspent_transaction_outs; perhaps just distinguish?
         unspent_transaction_outs = uto_apply_block(unspent_transaction_outs, block)
 
-        block_by_hash = self.block_by_hash.set(block.hash(), block)
+        block_by_hash: immutables.Map[bytes, Block] = self.block_by_hash.set(block.hash(), block)
 
         # TODO pruning of unspent_transaction_outs_by_hash on e.g. max delta-height; because it is used as part of
         # validation, such an approach implies a limit (to be implemented in validation) on how old a fork may be w.r.t.
@@ -216,6 +216,7 @@ class CoinState:
 
     def by_height_at_head(self) -> immutables.Map[int, Block]:
         # TODO just use 'at_head'
+        assert self.current_chain_hash
         return self.block_by_height_by_hash[self.current_chain_hash]
 
     @property
@@ -225,14 +226,17 @@ class CoinState:
             def unspent_transaction_outs(
                 inner_self,
             ) -> immutables.Map[OutputReference, Output]:
+                assert self.current_chain_hash
                 return self.unspent_transaction_outs_by_hash[self.current_chain_hash]
 
             @property
             def block_by_height(inner_self) -> immutables.Map[int, Block]:
+                assert self.current_chain_hash
                 return self.block_by_height_by_hash[self.current_chain_hash]
 
             @property
             def public_key_balances(inner_self) -> immutables.Map[PublicKey, PKBalance]:
+                assert self.current_chain_hash
                 return self.public_key_balances_by_hash[self.current_chain_hash]
 
         return AtHead()

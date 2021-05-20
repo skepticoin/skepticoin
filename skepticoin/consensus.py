@@ -1,4 +1,4 @@
-from typing import List, Mapping
+from typing import List, Mapping, Union
 
 import immutables
 
@@ -28,7 +28,7 @@ def calc_target(
     coinstate: CoinState,
     height: int,
     current_timestamp: int,
-    previous_block: BlockSummary,
+    previous_block: Union[Block, BlockSummary],
 ) -> bytes:
     if height % BLOCKS_BETWEEN_TARGET_READJUSTMENT == 0:
         interval_start_height = height - BLOCKS_BETWEEN_TARGET_READJUSTMENT
@@ -160,7 +160,7 @@ def construct_pow_evidence(
     else:
 
         def get_block_by_height(h: int) -> Block:
-            return coinstate.block_by_height_by_hash[summary.previous_block_hash][h]  # type: ignore
+            return coinstate.block_by_height_by_hash[summary.previous_block_hash][h]
 
         chain_sample = select_n_k_length_slices_from_chain(
             summary_hash, current_height, get_block_by_height, CHAIN_SAMPLE_COUNT, CHAIN_SAMPLE_SIZE)
@@ -198,7 +198,7 @@ def construct_block_for_mining_genesis(
     coinstate = CoinState.empty()
     current_height = 0
 
-    unspent_transaction_outs = immutables.Map()
+    unspent_transaction_outs: immutables.Map[OutputReference, Output] = immutables.Map()
 
     coinbase_transaction = construct_coinbase_transaction(
         current_height, non_coinbase_transactions, unspent_transaction_outs, random_data, miner_public_key)
@@ -222,6 +222,7 @@ def construct_block_for_mining(
     previous_block = coinstate.head()
     current_height = previous_block.height + 1
 
+    assert coinstate.current_chain_hash
     unspent_transaction_outs = coinstate.unspent_transaction_outs_by_hash[coinstate.current_chain_hash]
 
     coinbase_transaction = construct_coinbase_transaction(
