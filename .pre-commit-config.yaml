@@ -11,6 +11,8 @@ repos:
     -   id: mypy
         files: ^skepticoin/
         pass_filenames: false
+        language: system
+        entry: mypy
         args: [skepticoin, --strict, --implicit-reexport, --allow-subclassing-any, --allow-any-generics, --ignore-missing-imports]
 -   repo: local
     hooks:
