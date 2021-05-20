@@ -4,7 +4,7 @@ import sys
 import urllib.request
 from pathlib import Path
 from time import sleep, time
-from typing import Any, Optional
+from typing import Any
 import os
 import tempfile
 import logging
@@ -104,7 +104,7 @@ def start_networking_peer_in_background(
     args: Any, coinstate: CoinState
 ) -> NetworkingThread:
     print("Starting networking peer in background")
-    port: Optional[int] = None if args.dont_listen else args.listening_port
+    port = None if args.dont_listen else args.listening_port
     thread = NetworkingThread(coinstate, port)
     thread.local_peer.network_manager.disconnected_peers = load_peers()
     thread.start()
