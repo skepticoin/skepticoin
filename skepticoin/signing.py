@@ -23,6 +23,8 @@ TYPE_SECP256k1 = b'\x02'
 
 
 class PublicKey(Serializable):
+    def __init__(self) -> None:
+        self.public_key: bytes
 
     @classmethod
     def stream_deserialize(cls, f: BytesIO) -> SECP256k1PublicKey:

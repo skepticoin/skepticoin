@@ -9,7 +9,7 @@ import immutables
 from collections import namedtuple
 from pathlib import Path
 
-from skepticoin.coinstate import CoinState, PKBalance
+from skepticoin.coinstate import CoinState
 from skepticoin.signing import PublicKey
 from skepticoin.datatypes import Block, Output, OutputReference, Transaction
 from skepticoin.humans import human
@@ -172,7 +172,7 @@ Transaction | Output Index | Value | Address
                     for input in transaction.inputs:
                         output_reference = input.output_reference
                         if output_reference.hash != 32 * b'\x00':
-                            output = unspent_transaction_outs[output_reference]
+                            output: Output = unspent_transaction_outs[output_reference]
                             h = human(output_reference.hash)
                             v = show_coin(output.value)
                             a = "SKE" + human(output.public_key.public_key) + "PTI"
