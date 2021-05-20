@@ -5,9 +5,9 @@ import traceback
 from io import BytesIO
 import json
 from ipaddress import IPv6Address
-from threading import Lock  # type: ignore
+from threading import Lock
 from time import time
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 from skepticoin.coinstate import CoinState
 import random
@@ -159,7 +159,7 @@ class NetworkManager(Manager):
                 self.local_peer.logger.info("%15s ChainManager.broadcast_message error %s" % (peer.host, e))
 
 
-def inventory_batch_handled(peer: Peer) -> bool:
+def inventory_batch_handled(peer: Union[Peer, ConnectedRemotePeer]) -> bool:
     """Has the full loop GetBlocks -> Inventory -> GetData (n times) -> Data (n times) been completed?"""
     return not peer.waiting_for_inventory and peer.inventory_messages == []
 
@@ -327,7 +327,7 @@ class DisconnectedRemotePeer(RemotePeer):
 
 
 class MessageReceiver:
-    def __init__(self, peer: Peer):
+    def __init__(self, peer: Union[Peer, ConnectedRemotePeer]):
         self.peer = peer
 
         self.buffer = b''
@@ -349,7 +349,7 @@ class MessageReceiver:
         if self.len is None and len(self.buffer) >= 4:
             (self.len,) = struct.unpack(b">I", self.buffer[:4])
 
-            if self.len > MAX_MESSAGE_SIZE:
+            if self.len > MAX_MESSAGE_SIZE:  # type: ignore
                 raise Exception("len > MAX_MESSAGE_SIZE")
 
             self.buffer = self.buffer[4:]
@@ -404,7 +404,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.waiting_for_inventory: bool = False
         self.last_empty_inventory_response_at: int = 0
-        self.inventory_messages: List[InventoryMessage] = []
+        self.inventory_messages: List[InventoryMessageState] = []
 
         self._next_msg_id: int = 0
         self.last_get_peers_sent_at: Optional[int] = None
@@ -445,7 +445,7 @@ class ConnectedRemotePeer(RemotePeer):
         return self._next_msg_id  # 1 is the first message id (0 being reserved for "unknown"). Dijkstra's dead.
 
     def send_message(
-        self, message: DataMessage, prev_header: Optional[MessageHeader] = None
+        self, message: Message, prev_header: Optional[MessageHeader] = None
     ) -> None:
         if prev_header is None:
             in_response_to, context = 0, _new_context()
@@ -523,7 +523,7 @@ class ConnectedRemotePeer(RemotePeer):
         self, header: MessageHeader, message: HelloMessage
     ) -> None:
         self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_hello_message_received(%s)" % (self.host, message.user_agent))
+            "%15s ConnectedRemotePeer.handle_hello_message_received(%s)" % (self.host, str(message.user_agent)))
         self.hello_received = True
 
         if self.direction == INCOMING:
@@ -597,7 +597,7 @@ class ConnectedRemotePeer(RemotePeer):
 
     def _get_hash_from_inventory_messages(
         self,
-    ) -> Tuple[Optional[InventoryMessage], Optional[bytes]]:
+    ) -> Tuple[Optional[InventoryMessageState], Optional[bytes]]:
         while self.inventory_messages:
             msg_state = self.inventory_messages[0]
 
@@ -662,7 +662,7 @@ class ConnectedRemotePeer(RemotePeer):
 
     def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_data_message_received(%s %s)" % (
-            self.host, message.data_type, header.format()))
+            self.host, str(message.data_type), header.format()))
 
         if message.data_type == DATA_BLOCK:
             return self.handle_block_received(header, message)
@@ -677,7 +677,7 @@ class ConnectedRemotePeer(RemotePeer):
     ) -> None:
         # TODO deal with out-of-order blocks more gracefully
 
-        block = message.data
+        block: Block = message.data  # type: ignore
         coinstate = self.local_peer.chain_manager.coinstate
         assert coinstate
 
@@ -716,7 +716,7 @@ class ConnectedRemotePeer(RemotePeer):
     def handle_transaction_received(
         self, header: MessageHeader, message: DataMessage
     ) -> None:
-        transaction = message.data
+        transaction: Transaction = message.data  # type: ignore
         if transaction in self.local_peer.chain_manager.transaction_pool:
             return
 
@@ -726,18 +726,18 @@ class ConnectedRemotePeer(RemotePeer):
             self.local_peer.network_manager.broadcast_transaction(transaction)
 
     def handle_get_peers_message_received(
-        self, header: MessageHeader, message: PeersMessage
+        self, header: MessageHeader, message: GetPeersMessage
     ) -> None:
         peers: List[Peer] = []
 
-        peer: Peer
-        for peer in self.local_peer.network_manager.connected_peers.values():
-            if peer.direction == OUTGOING:
-                peers.append(Peer(int(time()), IPv6Address("::FFFF:%s" % peer.host), peer.port))
+        for con_peer in self.local_peer.network_manager.connected_peers.values():
+            if con_peer.direction == OUTGOING:
+                peers.append(Peer(int(time()), IPv6Address("::FFFF:%s" % con_peer.host), con_peer.port))
 
-        for peer in self.local_peer.network_manager.disconnected_peers.values():
-            if peer.direction == OUTGOING:
-                peers.append(Peer(0, IPv6Address("::FFFF:%s" % peer.host), peer.port))  # TODO 'last seen' time.
+        for discon_peer in self.local_peer.network_manager.disconnected_peers.values():
+            if discon_peer.direction == OUTGOING:
+                peers.append(Peer(0, IPv6Address("::FFFF:%s" % discon_peer.host),
+                             discon_peer.port))  # TODO 'last seen' time.
 
         # TODO filter out local network addresses (also on the receiving end)
         peers = peers[:1000]  # send 1000 peers max.
