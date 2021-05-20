@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from io import BytesIO
-from typing import Any, BinaryIO, Callable, List, Optional
+from typing import Any, BinaryIO, List, Optional
 
 from .humans import human
 from .serialization import (
@@ -308,45 +308,17 @@ class Block(Serializable):
         self.header = header
         self.transactions = transactions
 
-    @property
-    def version(self) -> int:
-        return self.header.version
+    def __getattr__(self, attr: str) -> Any:
+        """convenience: merge header and summary's attributes into the Block's accessors"""
+        # TODO for improved mypy type-checking, this needs to be split up
 
-    @property
-    def summary(self) -> BlockSummary:
-        return self.header.summary
+        if attr in ['version', 'summary', 'pow_evidence', 'hash']:
+            return getattr(self.header, attr)
 
-    @property
-    def pow_evidence(self) -> PowEvidence:
-        return self.header.pow_evidence
+        if attr in ['height', 'previous_block_hash', 'merkle_root_hash', 'timestamp', 'target', 'nonce']:
+            return getattr(self.header.summary, attr)
 
-    @property
-    def hash(self) -> Callable[[], bytes]:
-        return self.header.hash
-
-    @property
-    def height(self) -> int:
-        return self.header.summary.height
-
-    @property
-    def previous_block_hash(self) -> bytes:
-        return self.header.summary.previous_block_hash
-
-    @property
-    def merkle_root_hash(self) -> bytes:
-        return self.header.summary.merkle_root_hash
-
-    @property
-    def timestamp(self) -> int:
-        return self.header.summary.timestamp
-
-    @property
-    def target(self) -> bytes:
-        return self.header.summary.target
-
-    @property
-    def nonce(self) -> int:
-        return self.header.summary.nonce
+        raise AttributeError("'Block' object has no attribute '%s'" % attr)
 
     def __repr__(self) -> str:
         return "Block #%s" % human(self.header.hash())
@@ -371,7 +343,7 @@ class Block(Serializable):
 
     def get_total_work(self) -> int:
         # TODO this is totally a placeholder :-D
-        return self.height
+        return self.height  # type: ignore
 
 
 __all__ = [

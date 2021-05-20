@@ -176,6 +176,7 @@ class CoinState:
             block.hash(), public_key_balances)
 
         if block.previous_block_hash == b'\00' * 32:
+            block_by_height_by_hash: immutables.Map[bytes, immutables.Map[int, Block]]
             block_by_height_by_hash = immutables.Map({block.hash(): immutables.Map({0: block})})
         else:
             block_by_height = self.block_by_height_by_hash[block.previous_block_hash]
