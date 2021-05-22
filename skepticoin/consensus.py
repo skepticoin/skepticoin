@@ -1,4 +1,4 @@
-from typing import List, Mapping, Union
+from typing import List, Mapping, Tuple, Union
 
 import immutables
 
@@ -149,9 +149,22 @@ def construct_pow_evidence(
     current_height: int,
     transactions: List[Transaction],
 ) -> PowEvidence:
-    # Part 1 of the POW is to run scrypt. We put the most expensive operation first in an attempt to "up the ante"
-    summary_hash = scrypt(summary.serialize(), current_height.to_bytes(8, byteorder='big'))
+    summary_hash = construct_summary_hash(summary, current_height)
+    return construct_pow_evidence_after_scrypt(summary_hash, coinstate, summary, current_height, transactions)
 
+
+def construct_summary_hash(summary: BlockSummary, current_height: int) -> bytes:
+    # Part 1 of the POW is to run scrypt. We put the most expensive operation first in an attempt to "up the ante"
+    return scrypt(summary.serialize(), current_height.to_bytes(8, byteorder='big'))
+
+
+def construct_pow_evidence_after_scrypt(
+    summary_hash: bytes,
+    coinstate: CoinState,
+    summary: BlockSummary,
+    current_height: int,
+    transactions: List[Transaction],
+) -> PowEvidence:
     # Part 2 of the POW is to prove that you have fast access to the whole blockchain. This is to help actual full nodes
     # vis-a-vis opportunistic miners.
     if current_height == 0:
@@ -218,6 +231,27 @@ def construct_block_for_mining(
     random_data: bytes,
     nonce: int,
 ) -> Block:
+    summary, current_height, transactions = construct_block_pow_evidence_input(coinstate, non_coinbase_transactions,
+                                                                               miner_public_key, current_timestamp,
+                                                                               random_data, nonce)
+
+    evidence = construct_pow_evidence(coinstate, summary, current_height, transactions)
+    return Block(BlockHeader(summary, evidence), transactions)
+
+    # what would be nice to be able to verify independenly?
+    # 1. calculation of summary_hash. (at cost of running scrypt once on the summary)
+    # 2. calculation of any address byte individually (given the preceding bytes (if any) and a single block)
+    # 3. calculation of bytes_from_block (given the current_block,
+
+
+def construct_block_pow_evidence_input(
+    coinstate: CoinState,
+    non_coinbase_transactions: List[Transaction],
+    miner_public_key: SECP256k1PublicKey,
+    current_timestamp: int,
+    random_data: bytes,
+    nonce: int,
+) -> Tuple[BlockSummary, int, List[Transaction]]:
 
     previous_block = coinstate.head()
     current_height = previous_block.height + 1
@@ -231,13 +265,7 @@ def construct_block_for_mining(
     transactions = [coinbase_transaction] + non_coinbase_transactions
 
     summary = construct_minable_summary(coinstate, transactions, current_timestamp, nonce)
-    evidence = construct_pow_evidence(coinstate, summary, current_height, transactions)
-    return Block(BlockHeader(summary, evidence), transactions)
-
-    # what would be nice to be able to verify independenly?
-    # 1. calculation of summary_hash. (at cost of running scrypt once on the summary)
-    # 2. calculation of any address byte individually (given the preceding bytes (if any) and a single block)
-    # 3. calculation of bytes_from_block (given the current_block,
+    return summary, current_height, transactions
 
 
 # ## Section: Validation

@@ -18,7 +18,7 @@ from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.utils import block_filename
 from skepticoin.cheating import MAX_KNOWN_HASH_HEIGHT
 from time import time
-from multiprocessing import Process, Queue, synchronize
+from multiprocessing import Process, Queue
 from skepticoin.scripts.utils import (
     initialize_peers_file,
     create_chain_dir,
@@ -31,8 +31,8 @@ from skepticoin.scripts.utils import (
 )
 
 
-def run_miner(args: Any, wallet_lock: synchronize.Lock, queue: Queue, miner_id: int) -> None:
-    miner = Miner(args, wallet_lock, queue, miner_id)
+def run_miner(args: Any, send_queue: Queue, recv_queue: Queue, miner_id: int) -> None:
+    miner = Miner(args, send_queue, recv_queue, miner_id)
     miner()
 
 
