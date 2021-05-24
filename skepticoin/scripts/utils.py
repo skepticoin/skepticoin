@@ -3,6 +3,8 @@ import zipfile
 import sys
 import urllib.request
 from pathlib import Path
+from time import sleep, time
+from typing import Any, Optional
 import os
 import tempfile
 import logging
@@ -15,12 +17,9 @@ from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.networking.utils import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 
-from time import time, sleep
-
 
 class DefaultArgumentParser(argparse.ArgumentParser):
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.add_argument("--dont-listen", help="Don't listen for incoming connections", action="store_true")
         self.add_argument("--listening-port", help="Port to listen on", type=int, default=2412)
@@ -28,7 +27,7 @@ class DefaultArgumentParser(argparse.ArgumentParser):
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
 
 
-def initialize_peers_file():
+def initialize_peers_file() -> None:
     if not os.path.isfile("peers.json"):
         print("Creating new peers.json")
         with urllib.request.urlopen("https://pastebin.com/raw/CcfPX9mS") as response:
@@ -36,7 +35,7 @@ def initialize_peers_file():
                 f.write(response.read())
 
 
-def create_chain_dir():
+def create_chain_dir() -> None:
     if not os.path.exists('chain'):
         print("Pre-download blockchain from trusted source to 'blockchain-master'")
         with urllib.request.urlopen("https://github.com/skepticoin/blockchain/archive/refs/heads/master.zip") as resp:
@@ -48,7 +47,7 @@ def create_chain_dir():
         os.rename('blockchain-master', 'chain')
 
 
-def check_for_fresh_chain(thread):
+def check_for_fresh_chain(thread: NetworkingThread) -> bool:
     # wait until your chain is no more than 20 typical block-sizes old before you start mining yourself
     waited = False
     try:
@@ -70,7 +69,7 @@ def check_for_fresh_chain(thread):
     return waited
 
 
-def read_chain_from_disk():
+def read_chain_from_disk() -> CoinState:
     print("Reading chain from disk")
     coinstate = CoinState.zero()
     for filename in sorted(os.listdir('chain')):
@@ -89,7 +88,7 @@ def read_chain_from_disk():
     return coinstate
 
 
-def open_or_init_wallet():
+def open_or_init_wallet() -> Wallet:
     if os.path.isfile("wallet.json"):
         wallet = Wallet.load(open("wallet.json", "r"))
     else:
@@ -101,27 +100,29 @@ def open_or_init_wallet():
     return wallet
 
 
-def start_networking_peer_in_background(args, coinstate):
+def start_networking_peer_in_background(
+    args: Any, coinstate: CoinState
+) -> NetworkingThread:
     print("Starting networking peer in background")
-    port = None if args.dont_listen else args.listening_port
+    port: Optional[int] = None if args.dont_listen else args.listening_port
     thread = NetworkingThread(coinstate, port)
     thread.local_peer.network_manager.disconnected_peers = load_peers()
     thread.start()
     return thread
 
 
-def configure_logging_for_file():
+def configure_logging_for_file() -> None:
     log_filename = Path(tempfile.gettempdir()) / ("skepticoin-networking-%s.log" % int(time()))
     FORMAT = '%(asctime)s %(message)s'
     logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
 
 
-def configure_logging_for_stdout():
-    FORMAT = '%(asctime)s %(message)s'
+def configure_logging_for_stdout() -> None:
+    FORMAT = "%(asctime)s %(message)s"
     logging.basicConfig(format=FORMAT, stream=sys.stdout, level=logging.INFO)
 
 
-def configure_logging_from_args(args):
+def configure_logging_from_args(args: Any) -> None:
     if args.log_to_file:
         configure_logging_for_file()
 

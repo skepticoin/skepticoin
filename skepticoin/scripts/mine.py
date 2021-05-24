@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from decimal import Decimal
 from datetime import datetime
@@ -47,7 +46,7 @@ class Miner:
         message = (self.miner_id, message_type, data)
         self.queue.put(message)
 
-    def prepare(self):
+    def prepare(self) -> None:
         configure_logging_from_args(self.args)
 
         create_chain_dir()
@@ -66,7 +65,7 @@ class Miner:
 
         if self.thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
             self.send_message("info", "Your blockchain is not just old, it is ancient; ABORTING")
-            os.exit(0)
+            exit(0)
 
     def get_key_for_mined_block(self) -> bytes:
         self.wallet_lock.acquire()
@@ -142,7 +141,7 @@ def main() -> None:
     parser.add_argument('-n', default=1, type=int, help='number of miner instances')
     args = parser.parse_args()
 
-    queue = Queue()
+    queue: Queue = Queue()
     wallet_lock = Lock()
     processes = []
 

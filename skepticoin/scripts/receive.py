@@ -1,6 +1,5 @@
-from ..humans import human
-
-from .utils import (
+from skepticoin.humans import human
+from skepticoin.scripts.utils import (
     open_or_init_wallet,
     save_wallet,
     configure_logging_from_args,
@@ -8,7 +7,7 @@ from .utils import (
 )
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument("annotation", help="Some text to help you remember a meaning for this receive address.")
     args = parser.parse_args()

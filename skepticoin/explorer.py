@@ -4,11 +4,14 @@
 from decimal import Decimal
 from datetime import datetime, timezone
 import os
+from typing import Callable
 import immutables
 from collections import namedtuple
 from pathlib import Path
 
-from skepticoin.datatypes import OutputReference
+from skepticoin.coinstate import CoinState
+from skepticoin.signing import PublicKey
+from skepticoin.datatypes import Block, Output, OutputReference, Transaction
 from skepticoin.humans import human
 from skepticoin.params import SASHIMI_PER_COIN
 
@@ -21,16 +24,21 @@ PKBalance2 = namedtuple('PKBalance2', [
 ])
 
 
-def show_coin(sashimi):
+def show_coin(sashimi: int) -> str:
     return "%.08f SKEPTI" % (Decimal(sashimi) / SASHIMI_PER_COIN)
 
 
-def pkb2_apply_transaction(unspent_transaction_outs, public_key_balances, transaction, is_coinbase):
+def pkb2_apply_transaction(
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
+    public_key_balances: immutables.Map[PublicKey, PKBalance2],
+    transaction: Transaction,
+    is_coinbase: bool,
+) -> immutables.Map[PublicKey, PKBalance2]:
     with public_key_balances.mutate() as mutable_public_key_balances:
         # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
         if not is_coinbase:
             for input in transaction.inputs:
-                previously_unspent_output = unspent_transaction_outs[input.output_reference]
+                previously_unspent_output: Output = unspent_transaction_outs[input.output_reference]
 
                 public_key = previously_unspent_output.public_key
                 mutable_public_key_balances[public_key] = PKBalance2(
@@ -66,7 +74,11 @@ def pkb2_apply_transaction(unspent_transaction_outs, public_key_balances, transa
         return mutable_public_key_balances.finish()
 
 
-def pkb2_apply_block(unspent_transaction_outs, public_key_balances, block):
+def pkb2_apply_block(
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
+    public_key_balances: immutables.Map[PublicKey, PKBalance2],
+    block: Block,
+) -> immutables.Map[PublicKey, PKBalance2]:
     public_key_balances = pkb2_apply_transaction(
         unspent_transaction_outs, public_key_balances, block.transactions[0], is_coinbase=True)
 
@@ -76,20 +88,26 @@ def pkb2_apply_block(unspent_transaction_outs, public_key_balances, block):
     return public_key_balances
 
 
-def get_unspent_transaction_outs_before_block(coinstate, block):
-    if block.previous_block_hash == b'\00' * 32:
+def get_unspent_transaction_outs_before_block(
+    coinstate: CoinState, block: Block
+) -> immutables.Map[OutputReference, Output]:
+    if block.previous_block_hash == b"\00" * 32:
         return immutables.Map()
     return coinstate.unspent_transaction_outs_by_hash[block.previous_block_hash]
 
 
-def build_pkb2_block(coinstate, block, public_key_balances_2):
+def build_pkb2_block(
+    coinstate: CoinState,
+    block: Block,
+    public_key_balances_2: immutables.Map[PublicKey, PKBalance2],
+) -> immutables.Map[PublicKey, PKBalance2]:
     # TODO factor this away.
     unspent_transaction_outs = get_unspent_transaction_outs_before_block(coinstate, block)
     return pkb2_apply_block(unspent_transaction_outs, public_key_balances_2, block)
 
 
-def build_pkb2(coinstate):
-    public_key_balances_2 = immutables.Map()
+def build_pkb2(coinstate: CoinState) -> immutables.Map[PublicKey, PKBalance2]:
+    public_key_balances_2: immutables.Map[PublicKey, PKBalance2] = immutables.Map()
 
     for height in range(coinstate.head().height + 1):
         block = coinstate.at_head.block_by_height[height]
@@ -98,11 +116,9 @@ def build_pkb2(coinstate):
     return public_key_balances_2
 
 
-def build_explorer(coinstate):
-    assert os.getenv("EXPLORER_DIR")
-    explorer_dir = Path(os.getenv("EXPLORER_DIR"))
-
-    public_key_balances_2 = immutables.Map()
+def build_explorer(coinstate: CoinState) -> None:
+    explorer_dir = Path(os.environ["EXPLORER_DIR"])
+    public_key_balances_2: immutables.Map[PublicKey, PKBalance2] = immutables.Map()
 
     for height in range(coinstate.head().height + 1):
         print("Block", height)
@@ -156,7 +172,7 @@ Transaction | Output Index | Value | Address
                     for input in transaction.inputs:
                         output_reference = input.output_reference
                         if output_reference.hash != 32 * b'\x00':
-                            output = unspent_transaction_outs[output_reference]
+                            output: Output = unspent_transaction_outs[output_reference]
                             h = human(output_reference.hash)
                             v = show_coin(output.value)
                             a = "SKE" + human(output.public_key.public_key) + "PTI"
@@ -218,5 +234,7 @@ Transaction | ...
 -- not spent --
 """)
 
+
+get_coinstate: Callable[..., CoinState]
 
 build_explorer(get_coinstate())  # noqa F821  (get_coinstate is a globally available variable in skepticoin-run)

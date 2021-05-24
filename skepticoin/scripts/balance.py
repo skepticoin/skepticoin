@@ -11,7 +11,7 @@ from .utils import (
 from ..params import SASHIMI_PER_COIN
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     args = parser.parse_args()
     configure_logging_from_args(args)

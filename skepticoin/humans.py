@@ -7,12 +7,12 @@ hexlifying them. We use plain old hexlify instead.
 from binascii import hexlify, unhexlify
 
 
-def human(b):
-    return hexlify(b).decode('utf-8')
+def human(b: bytes) -> str:
+    return hexlify(b).decode("utf-8")
 
 
-def computer(s):
-    return unhexlify(s.encode('utf-8'))
+def computer(s: str) -> bytes:
+    return unhexlify(s.encode("utf-8"))
 
 
 __all__ = ["human", "computer"]

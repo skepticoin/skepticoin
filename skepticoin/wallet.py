@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import os
+from typing import Dict, List, Mapping, Set, TextIO
+
 import ecdsa
 import json
 
-from .humans import human, computer
+from .coinstate import CoinState, PKBalance
+from .humans import computer, human
 from .signing import SECP256k1PublicKey, SECP256k1Signature
-from .datatypes import Input, Transaction, Output
-from .coinstate import PKBalance
+from .datatypes import Input, Transaction, Output, OutputReference
 
 
 class AddressParseError(Exception):
@@ -13,45 +17,51 @@ class AddressParseError(Exception):
 
 
 class Wallet:
-
-    def __init__(self, keypairs, unused_public_keys, public_key_annotations):
+    def __init__(
+        self,
+        keypairs: Dict[bytes, bytes],
+        unused_public_keys: List[bytes],
+        public_key_annotations: Dict[bytes, str],
+    ):
         self.keypairs = keypairs  # public => private
 
         self.unused_public_keys = unused_public_keys
         self.public_key_annotations = public_key_annotations
 
-        self.spent_transaction_outputs = set()  # TODO save to disk too at some point.
+        self.spent_transaction_outputs: Set[
+            OutputReference
+        ] = set()  # TODO save to disk too at some point.
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Wallet w/ %s keypairs" % len(self.keypairs)
 
     @classmethod
-    def empty(cls):
+    def empty(cls) -> Wallet:
         return cls({}, [], {})
 
-    def __getitem__(self, public_key):
+    def __getitem__(self, public_key: bytes) -> bytes:
         return self.keypairs[public_key]
 
-    def __contains__(self, public_key):
+    def __contains__(self, public_key: bytes) -> bool:
         return public_key in self.keypairs
 
-    def get_annotated_public_key(self, annotation):
+    def get_annotated_public_key(self, annotation: str) -> bytes:
         public_key = self.unused_public_keys.pop()
         self.public_key_annotations[public_key] = annotation
         return public_key
 
-    def generate_key(self):
+    def generate_key(self) -> None:
         sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)
         private_key = sk.to_string()  # deceptive naming: to_string() actually returns a bytes object
         public_key = sk.verifying_key.to_string()
         self.keypairs[public_key] = private_key
         self.unused_public_keys.append(public_key)
 
-    def generate_keys(self, n=100):
-        for i in range(n):
+    def generate_keys(self, n: int = 100) -> None:
+        for _ in range(n):
             self.generate_key()
 
-    def dump(self, f):
+    def dump(self, f: TextIO) -> None:
         # The Simplest Thing That Could Possibly Work (though not the most secure)
         json.dump({
             "keypairs": {human(k): human(v) for (k, v) in self.keypairs.items()},
@@ -60,7 +70,7 @@ class Wallet:
         }, f, indent=4)
 
     @classmethod
-    def load(cls, f):
+    def load(cls, f: TextIO) -> Wallet:
         d = json.load(f)
 
         return cls(
@@ -69,15 +79,19 @@ class Wallet:
             public_key_annotations={computer(k): annotation for (k, annotation) in d["public_key_annotations"].items()},
         )
 
-    def get_balance(self, coinstate):
+    def get_balance(self, coinstate: CoinState) -> int:
         return sum(
-            coinstate.public_key_balances_by_hash[coinstate.current_chain_hash].get(
+            coinstate.public_key_balances_by_hash[coinstate.current_chain_hash].get(  # type: ignore
                 SECP256k1PublicKey(pk), PKBalance(0, [])).value
             for pk in self.keypairs.keys()
         )
 
 
-def sign_transaction(wallet, unspent_transaction_outs, transaction):
+def sign_transaction(
+    wallet: Wallet,
+    unspent_transaction_outs: Mapping[OutputReference, Output],
+    transaction: Transaction,
+) -> Transaction:
     message = transaction.signable_equivalent().serialize()
 
     signed_inputs = []
@@ -108,7 +122,14 @@ def sign_transaction(wallet, unspent_transaction_outs, transaction):
     )
 
 
-def create_spend_transaction(wallet, coinstate, value, miners_fee, output_public_key, change_address):
+def create_spend_transaction(
+    wallet: Wallet,
+    coinstate: CoinState,
+    value: int,
+    miners_fee: int,
+    output_public_key: SECP256k1PublicKey,
+    change_address: SECP256k1PublicKey,
+) -> Transaction:
     collected_value = 0
     inputs = []
 
@@ -144,7 +165,7 @@ def create_spend_transaction(wallet, coinstate, value, miners_fee, output_public
     raise Exception("Insufficient balance")
 
 
-def save_wallet(wallet):
+def save_wallet(wallet: Wallet) -> None:
     # This manual handling of files is sure to create wallet file corruption at one point or another... oh well,
     # reliving the bitcoin experience one mistake at a time.
 
@@ -154,7 +175,7 @@ def save_wallet(wallet):
     os.replace("wallet.json.new", "wallet.json")
 
 
-def is_valid_address(full_skepticoin_address):
+def is_valid_address(full_skepticoin_address: str) -> bool:
     try:
         parse_address(full_skepticoin_address)
         return True
@@ -162,7 +183,7 @@ def is_valid_address(full_skepticoin_address):
         return False
 
 
-def parse_address(full_skepticoin_address):
+def parse_address(full_skepticoin_address: str) -> bytes:
     if full_skepticoin_address[:3] != "SKE":
         raise AddressParseError()
 

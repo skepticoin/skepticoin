@@ -1,5 +1,5 @@
 from skepticoin.__version__ import __version__
 
 
-def main():
+def main() -> None:
     print(__version__)

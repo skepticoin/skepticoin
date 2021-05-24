@@ -1,33 +1,31 @@
 import os
 
-from ptpython.repl import embed, run_config
 from ptpython.entry_points.run_ptpython import get_config_and_history_file
-
-from skepticoin.__version__ import __version__
+from ptpython.repl import PythonRepl, embed, run_config
 
 import skepticoin.datatypes
 import skepticoin.networking.messages
 import skepticoin.signing
 import skepticoin.humans
 from skepticoin.params import SASHIMI_PER_COIN
-
-from .utils import (
+from skepticoin.scripts.utils import (
+    configure_logging_from_args,
     initialize_peers_file,
     create_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
-    configure_logging_from_args,
     DefaultArgumentParser,
 )
+from .version import __version__
 
 
 class EverythingIsNone:
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> None:
         return None
 
 
-def main():
+def main() -> None:
     config_file, history_file = get_config_and_history_file(EverythingIsNone())
 
     parser = DefaultArgumentParser()
@@ -54,10 +52,10 @@ def main():
         }
 
         for module in [skepticoin.datatypes, skepticoin.networking.messages, skepticoin.signing, skepticoin.humans]:
-            for attr in module.__all__:
+            for attr in module.__all__:  # type: ignore
                 globals[attr] = getattr(module, attr)
 
-        def configure(repl) -> None:
+        def configure(repl: PythonRepl) -> None:
             if os.path.exists(config_file):
                 run_config(repl, config_file)
             else:

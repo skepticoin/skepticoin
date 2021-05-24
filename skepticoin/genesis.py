@@ -1,4 +1,4 @@
-from .humans import computer
+from skepticoin.humans import computer
 
 # In cryptocurrency tradition, the genesis block contains a newspaper headline that serves 2 purposes:
 #

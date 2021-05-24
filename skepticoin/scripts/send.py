@@ -21,7 +21,7 @@ from .utils import (
 )
 
 
-def main():
+def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument("amount", help="The amount of to send", type=int)
     parser.add_argument("denomination", help="'skepticoin' or 'sashimi'", choices=['skepticoin', 'sashimi'])
@@ -61,6 +61,7 @@ def main():
         )
 
         validate_non_coinbase_transaction_by_itself(transaction)
+        assert coinstate.current_chain_hash
         validate_non_coinbase_transaction_in_coinstate(transaction, coinstate.current_chain_hash, coinstate)
 
         print("Broadcasting transaction on the network", transaction)
@@ -73,6 +74,10 @@ def main():
 
             # it's late and I'm too lazy for the efficient & correct implementation.
             coinstate = thread.local_peer.chain_manager.coinstate
+
+            # TODO mypy complains coinstate could be None here
+            assert coinstate
+
             max_height = coinstate.head().height
 
             for i in range(10):

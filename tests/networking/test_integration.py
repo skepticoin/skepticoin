@@ -15,7 +15,7 @@ from skepticoin.datatypes import Block, Transaction, Input, Output, OutputRefere
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.messages import InventoryMessage
 from skepticoin.networking.threading import NetworkingThread
-from skepticoin.networking.utils import load_peers_from_list
+from skepticoin.networking.peer import load_peers_from_list
 
 CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("../testdata/chain")
 
