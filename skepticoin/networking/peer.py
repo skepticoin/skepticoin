@@ -7,7 +7,7 @@ import json
 from ipaddress import IPv6Address
 from threading import Lock
 from time import time
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple
 
 from skepticoin.coinstate import CoinState
 import random
@@ -159,7 +159,7 @@ class NetworkManager(Manager):
                 self.local_peer.logger.info("%15s ChainManager.broadcast_message error %s" % (peer.host, e))
 
 
-def inventory_batch_handled(peer: Union[Peer, ConnectedRemotePeer]) -> bool:
+def inventory_batch_handled(peer: ConnectedRemotePeer) -> bool:
     """Has the full loop GetBlocks -> Inventory -> GetData (n times) -> Data (n times) been completed?"""
     return not peer.waiting_for_inventory and peer.inventory_messages == []
 
@@ -327,7 +327,7 @@ class DisconnectedRemotePeer(RemotePeer):
 
 
 class MessageReceiver:
-    def __init__(self, peer: Union[Peer, ConnectedRemotePeer]):
+    def __init__(self, peer: ConnectedRemotePeer):
         self.peer = peer
 
         self.buffer = b''
