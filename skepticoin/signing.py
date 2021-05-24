@@ -9,8 +9,7 @@ One byte is reserved as a type_indicator if we ever want to offer more options (
 from __future__ import annotations
 
 import struct
-from io import BytesIO
-from typing import Any
+from typing import Any, BinaryIO
 
 import ecdsa  # NOTE "This library was not designed with security in mind."
 
@@ -27,7 +26,7 @@ class PublicKey(Serializable):
         self.public_key: bytes
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> SECP256k1PublicKey:
+    def stream_deserialize(cls, f: BinaryIO) -> SECP256k1PublicKey:
         type_indicator = safe_read(f, 1)
 
         if type_indicator == TYPE_SECP256k1:
@@ -55,12 +54,12 @@ class SECP256k1PublicKey(PublicKey):
         return hash(self.serialize())
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> SECP256k1PublicKey:
+    def stream_deserialize(cls, f: BinaryIO) -> SECP256k1PublicKey:
         # type_indicator has been read already by the superclass at this point.
         public_key: bytes = safe_read(f, 64)
         return cls(public_key)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(TYPE_SECP256k1)
         f.write(self.public_key)
 
@@ -80,7 +79,7 @@ class SECP256k1PublicKey(PublicKey):
 class Signature(Serializable):
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> Signature:
+    def stream_deserialize(cls, f: BinaryIO) -> Signature:
         type_indicator = safe_read(f, 1)
 
         if type_indicator == TYPE_SIGNABLE_EQUIVALENT:
@@ -113,11 +112,11 @@ class SignableEquivalent(Signature):
         return isinstance(other, SignableEquivalent)
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> SignableEquivalent:
+    def stream_deserialize(cls, f: BinaryIO) -> SignableEquivalent:
         # type_indicator has been read already by the superclass at this point.
         return cls()
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(TYPE_SIGNABLE_EQUIVALENT)
 
 
@@ -146,14 +145,14 @@ class CoinbaseData(Signature):
         return isinstance(other, CoinbaseData) and self.signature == other.signature
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> CoinbaseData:
+    def stream_deserialize(cls, f: BinaryIO) -> CoinbaseData:
         # type_indicator has been read already by the superclass at this point.
         (height,) = struct.unpack(b">I", safe_read(f, 4))
         (length,) = struct.unpack(b"B", safe_read(f, 1))
         signature = safe_read(f, length)
         return cls(height, signature)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(TYPE_COINBASE_DATA)
         f.write(struct.pack(b">I", self.height))
         f.write(struct.pack(b"B", len(self.signature)))
@@ -174,12 +173,12 @@ class SECP256k1Signature(Signature):
         return isinstance(other, SECP256k1Signature) and self.signature == other.signature
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> SECP256k1Signature:
+    def stream_deserialize(cls, f: BinaryIO) -> SECP256k1Signature:
         # type_indicator has been read already by the superclass at this point.
         signature = safe_read(f, 64)
         return cls(signature)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(TYPE_SECP256k1)
         f.write(self.signature)
 

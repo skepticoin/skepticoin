@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import struct
-from io import BytesIO
 from typing import Any, BinaryIO, List, Optional
 
 from .humans import human
@@ -44,12 +43,12 @@ class OutputReference(Serializable):
         return hash((self.hash, self.index))
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> OutputReference:
+    def stream_deserialize(cls, f: BinaryIO) -> OutputReference:
         hash = safe_read(f, 32)
         (index,) = struct.unpack(b">I", safe_read(f, 4))
         return cls(hash, index)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(self.hash)
         f.write(struct.pack(b">I", self.index))
 
@@ -80,12 +79,12 @@ class Input(Serializable):
         )
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> Input:
+    def stream_deserialize(cls, f: BinaryIO) -> Input:
         output_reference = OutputReference.stream_deserialize(f)
         signature = Signature.stream_deserialize(f)
         return cls(output_reference, signature)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         self.output_reference.stream_serialize(f)
         assert self.signature
         self.signature.stream_serialize(f)
@@ -115,12 +114,12 @@ class Output(Serializable):
         return self.value == other.value and self.public_key == other.public_key
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> Output:
+    def stream_deserialize(cls, f: BinaryIO) -> Output:
         (value,) = struct.unpack(b">Q", safe_read(f, 8))
         public_key = PublicKey.stream_deserialize(f)
         return cls(value, public_key)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(struct.pack(b">Q", self.value))
         self.public_key.stream_serialize(f)
 
@@ -141,7 +140,7 @@ class Transaction(Serializable):
         return self.inputs == other.inputs and self.outputs == other.outputs
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> Transaction:
+    def stream_deserialize(cls, f: BinaryIO) -> Transaction:
         if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 transactions")
 
@@ -149,7 +148,7 @@ class Transaction(Serializable):
         outputs = stream_deserialize_list(f, Output)
         return cls(inputs, outputs)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(struct.pack(b"B", self.version))
         stream_serialize_list(f, self.inputs)
         stream_serialize_list(f, self.outputs)
@@ -199,7 +198,7 @@ class PowEvidence(Serializable):
 
         return cls(summary_hash, chain_sample, block_hash)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(self.summary_hash)
         f.write(self.chain_sample)
         f.write(self.block_hash)
@@ -254,7 +253,7 @@ class BlockSummary(Serializable):
 
         return cls(height, previous_block_hash, merkle_root_hash, timestamp, target, nonce)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         stream_serialize_vlq(f, self.height)
         f.write(self.previous_block_hash)
         f.write(self.merkle_root_hash)
@@ -293,7 +292,7 @@ class BlockHeader(Serializable):
 
         return cls(summary, pow_evidence)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         f.write(struct.pack(b"B", self.version))
 
         self.summary.stream_serialize(f)
@@ -337,7 +336,7 @@ class Block(Serializable):
         transactions = stream_deserialize_list(f, Transaction)
         return cls(header, transactions)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         self.header.stream_serialize(f)
         stream_serialize_list(f, self.transactions)
 

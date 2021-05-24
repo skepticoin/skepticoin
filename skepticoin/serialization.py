@@ -29,11 +29,11 @@ class Serializable:
         f.seek(0)
         return cls.stream_deserialize(f)
 
-    def stream_serialize(self, f: BytesIO) -> None:
+    def stream_serialize(self, f: BinaryIO) -> None:
         raise NotImplementedError
 
     @classmethod
-    def stream_deserialize(cls, f: BytesIO) -> Serializable:
+    def stream_deserialize(cls, f: BinaryIO) -> Serializable:
         raise NotImplementedError
 
 
@@ -46,7 +46,7 @@ def safe_read(f: BinaryIO, n: int) -> bytes:
     return r
 
 
-def stream_serialize_list(f: BytesIO, lst: Sequence[Serializable]) -> None:
+def stream_serialize_list(f: BinaryIO, lst: Sequence[Serializable]) -> None:
     stream_serialize_vlq(f, len(lst))
     for elem in lst:
         elem.stream_serialize(f)
@@ -72,7 +72,7 @@ def deserialize_list(cls: Type, bytes_: bytes) -> Any:
     return cls.stream_deserialize(f)
 
 
-def stream_serialize_vlq(f: BytesIO, i: int) -> None:
+def stream_serialize_vlq(f: BinaryIO, i: int) -> None:
     r"""From wikipedia: https://en.wikipedia.org/wiki/Variable-length_quantity
 
     The encoding assumes an octet (an eight-bit byte) where the most significant bit (MSB), also commonly known as the
