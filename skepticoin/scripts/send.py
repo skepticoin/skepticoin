@@ -75,8 +75,7 @@ def main() -> None:
             # it's late and I'm too lazy for the efficient & correct implementation.
             coinstate = thread.local_peer.chain_manager.coinstate
 
-            # TODO mypy complains coinstate could be None here
-            assert coinstate
+            assert coinstate  # TODO this assert is to keep mypy from complaining coinstate could be None here
 
             max_height = coinstate.head().height
 
