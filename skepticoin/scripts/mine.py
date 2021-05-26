@@ -139,6 +139,7 @@ class Miner:
 def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument('-n', default=1, type=int, help='number of miner instances')
+    parser.add_argument('-quiet', action='store_true', help='quiet mode, do not print stats to the console every second')
     args = parser.parse_args()
 
     queue: Queue = Queue()
@@ -164,6 +165,10 @@ def main() -> None:
             miner_id, message_type, data = queue.get()
 
             if message_type == "hashes":
+
+                if args.quiet:
+                    continue
+
                 timestamp, hashes = data
 
                 if timestamp not in hash_stats:
