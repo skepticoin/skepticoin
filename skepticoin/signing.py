@@ -64,7 +64,6 @@ class SECP256k1PublicKey(PublicKey):
         f.write(self.public_key)
 
     def validate(self, signature: Any, message: bytes) -> bool:
-        breakpoint()
         if not isinstance(signature, SECP256k1Signature):
             return False
 
