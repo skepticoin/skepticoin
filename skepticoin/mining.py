@@ -244,8 +244,4 @@ class MinerWatcher:
         self.public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
         save_wallet(self.wallet)
 
-<<<<<<< HEAD
         self.balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
-=======
-        self.balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
->>>>>>> refactor: use 1 public key when mining with multiprocessing
