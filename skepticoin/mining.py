@@ -9,7 +9,6 @@ from typing import Any, Callable, Dict, List, Tuple
 
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.consensus import (
-    construct_block_for_mining,
     construct_block_pow_evidence_input,
     construct_pow_evidence_after_scrypt,
     construct_summary_hash,
@@ -19,7 +18,7 @@ from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.utils import block_filename
 from skepticoin.cheating import MAX_KNOWN_HASH_HEIGHT
 from time import time
-from multiprocessing import Process, Lock, Queue, synchronize
+from multiprocessing import Process, Queue, synchronize
 from skepticoin.scripts.utils import (
     initialize_peers_file,
     create_chain_dir,
@@ -38,106 +37,48 @@ def run_miner(args: Any, wallet_lock: synchronize.Lock, queue: Queue, miner_id: 
 
 
 class Miner:
-    def __init__(self, args: Any, wallet_lock: synchronize.Lock, queue: Queue, miner_id: int) -> None:
+    def __init__(self, args: Any, send_queue: Queue, recv_queue: Queue, miner_id: int) -> None:
         self.args = args
-        self.wallet_lock = wallet_lock
-        self.queue = queue
+        self.send_queue = send_queue
+        self.recv_queue = recv_queue
         self.miner_id = miner_id
-        self.wallet: Wallet
-        self.coinstate: CoinState
-        self.thread: NetworkingThread
 
     def send_message(self, message_type: str, data: Any) -> None:
         message = (self.miner_id, message_type, data)
-        self.queue.put(message)
+        self.send_queue.put(message)
 
-    def prepare(self) -> None:
-        configure_logging_from_args(self.args)
+    def wait_for_message(self, expected_message_type: str) -> Any:
+        message_type, data = self.recv_queue.get()
 
-        create_chain_dir()
-        self.coinstate = read_chain_from_disk()
+        if message_type != expected_message_type:
+            print(f"WARNING: expected message type {expected_message_type}, got {message_type}")
+            exit(1)
 
-        self.wallet_lock.acquire()
-        self.wallet = open_or_init_wallet()
-        self.wallet_lock.release()
+        return data
 
-        initialize_peers_file()
-        self.thread = start_networking_peer_in_background(self.args, self.coinstate)
-        self.thread.local_peer.show_stats()
-
-        if check_for_fresh_chain(self.thread):
-            self.thread.local_peer.show_stats()
-
-        if self.thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
-            self.send_message("info", "Your blockchain is not just old, it is ancient; ABORTING")
-            exit(0)
-
-    def get_key_for_mined_block(self) -> bytes:
-        self.wallet_lock.acquire()
-        public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
-        save_wallet(self.wallet)
-        self.wallet_lock.release()
-        return public_key
-
-    def get_balance(self) -> Decimal:
-        self.wallet_lock.acquire()
-        balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
-        self.wallet_lock.release()
-        return balance
-
-    def handle_mined_block(self, block: Block) -> None:
-        self.coinstate = self.coinstate.add_block(block, int(time()))
-        with open(Path('chain') / block_filename(block), 'wb') as f:
-            f.write(block.serialize())
-
-        self.send_message("found_block", block_filename(block))
-        self.send_message("balance", self.get_balance())
-
-        self.thread.local_peer.chain_manager.set_coinstate(self.coinstate)
-        self.thread.local_peer.network_manager.broadcast_block(block)
+    def get_scrypt_input(self, nonce: int) -> Tuple[BlockSummary, int, bytes]:
+        self.send_message("request_scrypt_input", nonce)
+        summary, current_height, public_key = self.wait_for_message("scrypt_input")
+        return summary, current_height, public_key
 
     def __call__(self) -> None:
-        self.prepare()
-        self.send_message("start_balance", self.get_balance())
+        configure_logging_from_args(self.args)
         self.send_message("info", "Starting mining: A repeat minter")
 
+        nonce = random.randrange(1 << 32)
+
         try:
-            public_key = self.get_key_for_mined_block()
-            nonce = random.randrange(1 << 32)
-            last_round_second = int(time())
-            hashes = 0
-
             while True:
-                current_second = int(time())
+                summary, current_height, public_key = self.get_scrypt_input(nonce)
+                summary_hash = construct_summary_hash(summary, current_height)
+                self.send_message('scrypt_output', summary_hash)
 
-                if current_second > last_round_second and not self.args.quiet:
-                    self.send_message("hashes", (current_second, hashes))
-                    last_round_second = current_second
-                    hashes = 0
-
-                self.coinstate, transactions = self.thread.local_peer.chain_manager.get_state()
-                increasing_time = max(current_second, self.coinstate.head().timestamp + 1)
-
-                block = construct_block_for_mining(
-                    self.coinstate, transactions, SECP256k1PublicKey(public_key), increasing_time, b'', nonce)
-
-                hashes += 1
                 nonce = (nonce + 1) % (1 << 32)
-
-                if block.hash() < block.target:
-                    self.handle_mined_block(block)
-                    public_key = self.get_key_for_mined_block()
 
         except KeyboardInterrupt:
             self.send_message("info", "KeyboardInterrupt")
 
         finally:
-            self.send_message("info", "Stopping networking thread")
-            self.thread.stop()
-
-            self.send_message("info", "Waiting for networking thread to stop")
-            self.thread.join()
-
             self.send_message("info", "Done; waiting for Python-exit")
 
 
@@ -217,6 +158,9 @@ class MinerWatcher:
                 process.join()
 
     def print_stats_line(self, timestamp: int) -> None:
+        if self.args.quiet:
+            return
+
         now = datetime.fromtimestamp(timestamp)
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -239,20 +183,19 @@ class MinerWatcher:
         message_handlers: Dict[str, Callable[[int, Any], None]] = {
             "info": self.handle_info_message,
             "request_scrypt_input": self.handle_request_scrypt_input_message,
-            "request_public_key": self.handle_request_public_key_message,
             "scrypt_output": self.handle_scrypt_output_message,
         }
 
-        try:
-            handler = message_handlers[message_type]
-        except KeyError:
+        def handle_unknown_message(miner_id: int, data: Any) -> None:
             print(f"unhandled message_type {message_type} from {miner_id}, data={data}")
-            return
 
+        handler = message_handlers.get(message_type, handle_unknown_message)
         handler(miner_id, data)
 
-    def handle_request_scrypt_input_message(self, miner_id: int, data: Tuple[bytes, int]) -> None:
-        public_key, nonce = data
+    def handle_request_scrypt_input_message(self, miner_id: int, data: int) -> None:
+        nonce: int = data
+        public_key: bytes = self.public_key
+
         coinstate, transactions = self.network_thread.local_peer.chain_manager.get_state()
         increasing_time = max(int(time()), coinstate.head().timestamp + 1)
 
@@ -261,8 +204,7 @@ class MinerWatcher:
                                                increasing_time, b'', nonce)
 
         self.mining_args[miner_id] = summary, current_height, transactions
-
-        self.send_message(miner_id, "scrypt_input", (summary, current_height))
+        self.send_message(miner_id, "scrypt_input", (summary, current_height, public_key))
 
     def increment_hash_counter(self) -> None:
         timestamp = int(time())
@@ -280,10 +222,6 @@ class MinerWatcher:
 
     def handle_info_message(self, miner_id: int, data: str) -> None:
         print(f"miner {miner_id:2}: {data}")
-
-    def handle_request_public_key_message(self, miner_id: int, data: Tuple[()]) -> None:
-        # TODO add public key to response of handle_request_scrypt_input_message
-        self.send_message(miner_id, "public_key", self.public_key)
 
     def handle_scrypt_output_message(self, miner_id: int, data: bytes) -> None:
         summary_hash: bytes = data
