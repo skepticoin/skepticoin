@@ -1,14 +1,19 @@
 from pathlib import Path
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
-from skepticoin.datatypes import Block
+from skepticoin.datatypes import Block, BlockHeader, BlockSummary, Transaction
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 from skepticoin.params import SASHIMI_PER_COIN
-from skepticoin.consensus import construct_block_for_mining
+from skepticoin.consensus import (
+    construct_block_for_mining,
+    construct_block_pow_evidence_input,
+    construct_pow_evidence_after_scrypt,
+    construct_summary_hash,
+)
 from skepticoin.signing import SECP256k1PublicKey
 from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.utils import block_filename
@@ -143,97 +148,170 @@ class MinerWatcher:
         parser.add_argument('--quiet', action='store_true', help='do not print stats to the console every second')
         self.args = parser.parse_args()
 
-        self.queue: Queue = Queue()
-        self.wallet_lock: synchronize.Lock = Lock()
+        self.recv_queue: Queue = Queue()
+        self.send_queues: List[Queue] = []
         self.processes: List[Process] = []
 
-        self.hash_stats: Dict[int, Dict[int, int]] = {}
+        self.hash_stats: Dict[int, int] = {}
         self.balance: Decimal = Decimal(0)
         self.start_balance: Decimal = Decimal(0)
         self.start_time: datetime
+        self.wallet: Wallet
+        self.coinstate: CoinState
+        self.network_thread: NetworkingThread
+        self.mining_args: Dict[int, Tuple[BlockSummary, int, List[Transaction]]] = {}
+        self.public_key: bytes
 
     def __call__(self) -> None:
-        for i in range(self.args.n):
-            if i > 0:
+        create_chain_dir()
+        self.coinstate = read_chain_from_disk()
+
+        self.wallet = open_or_init_wallet()
+        self.start_balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
+        self.balance = self.start_balance
+
+        initialize_peers_file()
+        self.network_thread = start_networking_peer_in_background(self.args, self.coinstate)
+
+        self.network_thread.local_peer.show_stats()
+
+        if check_for_fresh_chain(self.network_thread):
+            self.network_thread.local_peer.show_stats()
+
+        if self.network_thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
+            print("Your blockchain is not just old, it is ancient; ABORTING")
+            exit(1)
+
+        self.public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
+        save_wallet(self.wallet)
+
+        for miner_id in range(self.args.n):
+            if miner_id > 0:
                 self.args.dont_listen = True
 
-            process = Process(target=run_miner, daemon=True, args=(self.args, self.wallet_lock, self.queue, i))
+            send_queue: Queue = Queue()
+            process = Process(target=run_miner, daemon=True,
+                              args=(self.args, self.recv_queue, send_queue, miner_id))
             process.start()
             self.processes.append(process)
+            self.send_queues.append(send_queue)
 
-        self.start_time = datetime.now()
+        self.start_time = datetime.now() - timedelta(seconds=1)  # prevent negative uptime due to second rounding
 
         try:
             while True:
-                queue_item: Tuple[int, str, Any] = self.queue.get()
-                self.handle_message(queue_item)
+                queue_item: Tuple[int, str, Any] = self.recv_queue.get()
+                self.handle_received_message(queue_item)
+
         except KeyboardInterrupt:
             pass
+
         finally:
+            print("Stopping networking thread")
+            self.network_thread.stop()
+
+            print("Waiting for networking thread to stop")
+            self.network_thread.join()
+
             for process in self.processes:
                 process.join()
 
-    def get_stats_line(self, timestamp: int) -> str:
-
-        now = datetime.now()
+    def print_stats_line(self, timestamp: int) -> None:
+        now = datetime.fromtimestamp(timestamp)
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
         uptime = now - self.start_time
         uptime_str = str(uptime).split(".")[0]
 
         mined = self.balance - self.start_balance
-        total_hashes = sum(self.hash_stats[timestamp].values())
+        hashes = self.hash_stats[timestamp]
 
         mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
-        return (f"{now_str} | uptime: {uptime_str} | {total_hashes:>3} hash/sec" +
-                f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
+        print(f"{now_str} | uptime: {uptime_str} | {hashes:>3} hash/sec" +
+              f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
 
-    def cleanup_old_hash_stats(self) -> None:
-        current_time = int(time())
+    def send_message(self, miner_id: int, message_type: str, data: Any) -> None:
+        self.send_queues[miner_id].put((message_type, data))
 
-        for timestamp, stats_per_timestamp in sorted(list(self.hash_stats.items())):
-            count = len(stats_per_timestamp)
-
-            if timestamp < current_time and count < self.args.n:
-                timestamp_str = datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
-                print(f"{timestamp_str} | WARNING: Only got stats from {count} of {self.args.n} miners")
-
-                # print old stats line: incomplete stats are better than no stats
-                print(self.get_stats_line(timestamp))
-                del self.hash_stats[timestamp]
-
-    def handle_message(self, queue_item: Tuple[int, str, Any]) -> None:
+    def handle_received_message(self, queue_item: Tuple[int, str, Any]) -> None:
         miner_id, message_type, data = queue_item
 
-        if message_type == "hashes":
-            timestamp: int
-            hash_count: int
+        message_handlers: Dict[str, Callable[[int, Any], None]] = {
+            "info": self.handle_info_message,
+            "request_scrypt_input": self.handle_request_scrypt_input_message,
+            "request_public_key": self.handle_request_public_key_message,
+            "scrypt_output": self.handle_scrypt_output_message,
+        }
 
-            timestamp, hash_count = data
-
-            if timestamp not in self.hash_stats:
-                self.hash_stats[timestamp] = {}
-
-            self.hash_stats[timestamp][miner_id] = hash_count
-
-            self.cleanup_old_hash_stats()
-
-            if len(self.hash_stats[timestamp]) == self.args.n:
-                print(self.get_stats_line(timestamp))
-                del self.hash_stats[timestamp]
-
-        elif message_type == "balance":
-            self.balance = data
-
-        elif message_type == "start_balance":
-            self.start_balance = data
-            self.balance = data
-
-        elif message_type == "found_block":
-            print(f"miner {miner_id:2} found block: {data}")
-
-        elif message_type == "info":
-            print(f"miner {miner_id:2}: {data}")
-
-        else:
+        try:
+            handler = message_handlers[message_type]
+        except KeyError:
             print(f"unhandled message_type {message_type} from {miner_id}, data={data}")
+            return
+
+        handler(miner_id, data)
+
+    def handle_request_scrypt_input_message(self, miner_id: int, data: Tuple[bytes, int]) -> None:
+        public_key, nonce = data
+        coinstate, transactions = self.network_thread.local_peer.chain_manager.get_state()
+        increasing_time = max(int(time()), coinstate.head().timestamp + 1)
+
+        summary, current_height, transactions = \
+            construct_block_pow_evidence_input(coinstate, transactions, SECP256k1PublicKey(public_key),
+                                               increasing_time, b'', nonce)
+
+        self.mining_args[miner_id] = summary, current_height, transactions
+
+        self.send_message(miner_id, "scrypt_input", (summary, current_height))
+
+    def increment_hash_counter(self) -> None:
+        timestamp = int(time())
+
+        if timestamp not in self.hash_stats:
+
+            # this is a new second: print and delete last stat(s)
+            for ts in sorted(list(self.hash_stats.keys())):
+                self.print_stats_line(ts)
+                del self.hash_stats[ts]
+
+            self.hash_stats[timestamp] = 0
+
+        self.hash_stats[timestamp] += 1
+
+    def handle_info_message(self, miner_id: int, data: str) -> None:
+        print(f"miner {miner_id:2}: {data}")
+
+    def handle_request_public_key_message(self, miner_id: int, data: Tuple[()]) -> None:
+        # TODO add public key to response of handle_request_scrypt_input_message
+        self.send_message(miner_id, "public_key", self.public_key)
+
+    def handle_scrypt_output_message(self, miner_id: int, data: bytes) -> None:
+        summary_hash: bytes = data
+
+        self.increment_hash_counter()
+
+        summary, current_height, transactions = self.mining_args[miner_id]
+
+        evidence = construct_pow_evidence_after_scrypt(summary_hash, self.coinstate, summary,
+                                                       current_height, transactions)
+
+        block = Block(BlockHeader(summary, evidence), transactions)
+
+        if block.hash() >= block.target:
+            # we didn't mine the block
+            return
+
+        self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
+        self.network_thread.local_peer.network_manager.broadcast_block(block)
+
+        self.coinstate = self.coinstate.add_block(block, int(time()))
+        with open(Path('chain') / block_filename(block), 'wb') as f:
+            f.write(block.serialize())
+
+        print(f"miner {miner_id} found block: {block_filename(block)}")
+
+        # get new public key for miner
+        self.public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
+        save_wallet(self.wallet)
+
+        self.balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
