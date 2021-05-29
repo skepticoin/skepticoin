@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Callable
 
 import immutables
 
@@ -122,6 +122,31 @@ class CoinState:
 
         # block_hash -> (public_key -> (value, [OutputReference]))
         self.public_key_balances_by_hash = public_key_balances_by_hash
+
+    def dump(self, dumper: Callable[[Any]]):
+        """
+        Dump the chain so that it can be loaded by the load() method later. 
+        Currently we only save the blocks. It would be better to save the other stuff too, but that's not possible right now.
+        DUMPER function must be passed as a parameter, to allow the calling code to control the actual file format.
+        """
+        dumper(self.block_by_hash)
+        #These are commented out because they cause infinite loop:
+        #dumper(self.unspent_transaction_outs_by_hash)
+        #dumper(self.block_by_height_by_hash)
+        #dumper(self.heads)
+        #dumper(self.current_chain_hash)
+        #dumper(self.public_key_balances_by_hash)
+
+    @classmethod
+    def load(self, loader: Callable[[], Any]):
+        "Faster way to load a previously dump()'d blockchain."
+        block_by_hash = loader()
+        coinstate = CoinState.zero()
+        sorted_blocks = list(block_by_hash.values())
+        sorted_blocks.sort(key=lambda block: block.height)
+        for block in sorted_blocks:
+            coinstate = coinstate.add_block_no_validation(block)
+        return coinstate
 
     def __repr__(self) -> str:
         if self.current_chain_hash is None:
