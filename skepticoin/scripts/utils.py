@@ -107,6 +107,7 @@ def start_networking_peer_in_background(
     port: Optional[int] = None if args.dont_listen else args.listening_port
     thread = NetworkingThread(coinstate, port)
     thread.local_peer.network_manager.disconnected_peers = load_peers()
+    thread.daemon = True
     thread.start()
     return thread
 

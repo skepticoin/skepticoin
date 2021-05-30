@@ -1,4 +1,5 @@
 from datetime import datetime
+import sys
 
 from .utils import (
     open_or_init_wallet,
@@ -31,3 +32,5 @@ def main() -> None:
     print(
         wallet.get_balance(coinstate) / SASHIMI_PER_COIN, "SKEPTI at h. %s," % coinstate.head().height,
         datetime.fromtimestamp(coinstate.head().timestamp).isoformat())
+
+    print("Waiting for networking thread to exit.")
