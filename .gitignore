@@ -9,3 +9,7 @@ dist
 skepticoin/scmversion.py
 
 __pycache__
+**/wallet.json 
+**/peers.json 
+**/chain/ 
+**/chain.cache
