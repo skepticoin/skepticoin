@@ -1,5 +1,4 @@
 from datetime import datetime
-import sys
 
 from .utils import (
     open_or_init_wallet,
