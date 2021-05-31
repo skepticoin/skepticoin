@@ -932,25 +932,29 @@ class LocalPeer:
         self.logger.info("%15s LocalPeer.stop()" % "")
         self.running = False
 
-    def show_stats(self) -> None:
+    def show_stats(self, suppressDuplicates: List[str] = [""]) -> None:
         coinstate = self.chain_manager.coinstate
         assert coinstate
 
-        print("NETWORK")
-        print("Nr. of connected peers:", len(self.network_manager.get_active_peers()))
-        for p in self.network_manager.get_active_peers()[:10]:
-            print("%15s:%s - %s" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction))  # type: ignore
+        out = "NETWORK - %d connected peers: \n" % len(self.network_manager.get_active_peers())
+        for p in self.network_manager.get_active_peers():
+            # type: ignore
+            out += "  %15s:%s %s, \n" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction)
 
-        print("\nCHAIN")
+        out += "CHAIN - "
         for (head, lca) in coinstate.forks():
             if head.height < coinstate.head().height - 10:
                 continue  # don't show forks which are out-ran by more than 10 blocks
 
-            print("Height    %s" % head.height)
-            print("Date/time %s" % datetime.fromtimestamp(head.timestamp).isoformat())
+            out += "Height = %s, " % head.height
+            out += "Date/time = %s\n" % datetime.fromtimestamp(head.timestamp).isoformat()
             if head.height != lca.height:
-                print("diverges for %s blocks" % (head.height - lca.height))
-            print()
+                out += "  diverges for %s blocks\n" % (head.height - lca.height)
+            out += "\n"
+
+        if out != suppressDuplicates[0]:
+            print(out)
+            suppressDuplicates[0] = out
 
     def show_network_stats(self) -> None:
         print("NETWORK")
