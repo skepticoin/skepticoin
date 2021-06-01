@@ -6,7 +6,7 @@ import requests
 import urllib.request
 from pathlib import Path
 from time import sleep, time
-from typing import Any, List, Optional
+from typing import Any, Optional, Set, Tuple
 import os
 import tempfile
 import logging
@@ -35,7 +35,7 @@ def initialize_peers_file() -> None:
     if os.path.isfile("peers.json"):
         return
 
-    peers: List[List[Any]] = []
+    all_peers: Set[Tuple[str, int, str]] = set()
 
     with open("peer_urls.txt", "r") as file:
         for url in file:
@@ -44,15 +44,21 @@ def initialize_peers_file() -> None:
                 r = requests.get(url, timeout=1)
                 r.raise_for_status()
             except RequestException:
-                pass
+                continue
 
             try:
-                peers += r.json()
+                peers = r.json()
             except ValueError:
-                pass
+                continue
+
+            for peer in peers:
+                if len(peer) != 3:
+                    continue
+
+                all_peers.add(tuple(peer))  # type: ignore
 
     print("Creating new peers.json")
-    json.dump(peers, open("peers.json", "w"))
+    json.dump(list(list(peer) for peer in peers), open("peers.json", "w"))
 
 
 def create_chain_dir() -> None:
