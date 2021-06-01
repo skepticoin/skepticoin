@@ -1,14 +1,18 @@
+import json
 from io import BytesIO
 import zipfile
 import sys
+import requests
 import urllib.request
 from pathlib import Path
 from time import sleep, time
-from typing import Any, Optional
+from typing import Any, List, Optional
 import os
 import tempfile
 import logging
 import argparse
+
+from requests.exceptions import RequestException
 
 from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
@@ -28,11 +32,27 @@ class DefaultArgumentParser(argparse.ArgumentParser):
 
 
 def initialize_peers_file() -> None:
-    if not os.path.isfile("peers.json"):
-        print("Creating new peers.json")
-        with urllib.request.urlopen("https://pastebin.com/raw/CcfPX9mS") as response:
-            with open("peers.json", "wb") as f:
-                f.write(response.read())
+    if os.path.isfile("peers.json"):
+        return
+
+    peers: List[List[Any]] = []
+
+    with open("peer_urls.txt", "r") as file:
+        for url in file:
+            print(f"downloading {url}")
+            try:
+                r = requests.get(url, timeout=1)
+                r.raise_for_status()
+            except RequestException:
+                pass
+
+            try:
+                peers += r.json()
+            except ValueError:
+                pass
+
+    print("Creating new peers.json")
+    json.dump(peers, open("peers.json", "w"))
 
 
 def create_chain_dir() -> None:
