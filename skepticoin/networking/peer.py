@@ -399,9 +399,6 @@ class ConnectedRemotePeer(RemotePeer):
         self.hello_sent: bool = False
         self.hello_received: bool = False
 
-        self.sent: bytes = b""
-        self.received: bytes = b""
-
         self.waiting_for_inventory: bool = False
         self.last_empty_inventory_response_at: int = 0
         self.inventory_messages: List[InventoryMessageState] = []
@@ -506,7 +503,6 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.logger.info("ConnectedRemotePeer.handle_can_send()")
 
         sent = sock.send(self.send_buffer)
-        self.sent += self.send_buffer[:sent]
         self.send_buffer = self.send_buffer[sent:]
 
         if len(self.send_buffer) == 0:
@@ -515,8 +511,6 @@ class ConnectedRemotePeer(RemotePeer):
 
     def handle_receive_data(self, data: bytes) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data()" % self.host)
-        self.received += data
-
         self.receiver.receive(data)
 
     def handle_hello_message_received(
