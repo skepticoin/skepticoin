@@ -938,8 +938,8 @@ class LocalPeer:
 
         out = "NETWORK - %d connected peers: \n" % len(self.network_manager.get_active_peers())
         for p in self.network_manager.get_active_peers():
-            # type: ignore
-            out += "  %15s:%s %s, \n" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction)
+            # TODO: Fix inconsistent usage of datatypes for PORT. int or str, pick one!
+            out += "  %15s:%s %s,\n" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction)  # type: ignore
 
         out += "CHAIN - "
         for (head, lca) in coinstate.forks():
