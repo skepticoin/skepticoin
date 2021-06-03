@@ -139,7 +139,7 @@ class Miner:
 def main() -> None:
     parser = DefaultArgumentParser()
     parser.add_argument('-n', default=1, type=int, help='number of miner instances')
-    parser.add_argument('-quiet', action='store_true', help='quiet mode, do not print stats to the console every second')
+    parser.add_argument('--quiet', action='store_true', help='do not print stats to the console every second')
     args = parser.parse_args()
 
     queue: Queue = Queue()
