@@ -80,9 +80,9 @@ def read_chain_from_disk() -> CoinState:
         coinstate = CoinState.zero()
         height = 0
 
-    fresherChain = sorted(os.listdir('chain'))[height:]
-    print("Reading chain from disk, starting height=%d, fresher=%d" % (height, len(fresherChain)))
-    for filename in fresherChain:
+    fresher_chain = sorted(os.listdir('chain'))[height:]
+    print("Reading chain from disk, starting height=%d, fresher=%d" % (height, len(fresher_chain)))
+    for filename in fresher_chain:
         height = int(filename.split("-")[0])
         if height % 1000 == 0:
             print(filename)
@@ -95,7 +95,7 @@ def read_chain_from_disk() -> CoinState:
 
         coinstate = coinstate.add_block_no_validation(block)
 
-    if fresherChain:
+    if fresher_chain:
         print("Caching chain for faster loading next time")
         # Currently this takes about 2 seconds. It could be optimized further if we switch to an appendable file format for the cache.
         with open('chain.cache','wb') as file:
