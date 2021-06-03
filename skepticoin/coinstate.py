@@ -125,8 +125,8 @@ class CoinState:
 
     def dump(self, dumper: Callable[[Any]]):
         """
-        Dump the chain so that it can be loaded by the load() method later. 
-        Currently we only save the blocks. It would be better to save the other stuff too, but that's not convenient right now.
+        Dump the chain so that it can be loaded by the load() method later. Currently we only save the blocks.
+        It would be better to save the other stuff too, but that's not convenient right now.
         DUMPER function must be passed as a parameter, to allow the calling code to control the actual file format.
         """
         dumper(self.block_by_hash)
