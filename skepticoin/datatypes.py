@@ -274,6 +274,11 @@ class BlockSummary(Serializable):
 
 class BlockHeader(Serializable):
 
+    version: Final[int]
+    summary: Final[BlockSummary]
+    pow_evidence: Final[PowEvidence]
+    cached_hash: Final[str]
+
     def __init__(self, summary: BlockSummary, pow_evidence: PowEvidence):
         self.version = 0
         self.summary = summary
