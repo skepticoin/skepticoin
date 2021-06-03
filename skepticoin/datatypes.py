@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import struct
-from typing import Any, BinaryIO, List, Optional
+from typing import Any, BinaryIO, List, Optional, Final
 
 from .humans import human
 from .serialization import (
@@ -125,6 +125,12 @@ class Output(Serializable):
 
 
 class Transaction(Serializable):
+
+    version: Final[int]
+    inputs: Final[List[Input]]
+    outputs: Final[List[Output]]
+    cached_hash: Final[str]
+
     def __init__(self, inputs: List[Input], outputs: List[Output]):
         self.version = 0  # reserved for future use; the class does not take this as a param.
         self.inputs = inputs
