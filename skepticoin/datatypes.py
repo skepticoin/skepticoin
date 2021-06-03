@@ -129,7 +129,7 @@ class Transaction(Serializable):
     version: Final[int]
     inputs: Final[List[Input]]
     outputs: Final[List[Output]]
-    cached_hash: Final[str]
+    cached_hash: Final[bytes]
 
     def __init__(self, inputs: List[Input], outputs: List[Output]):
         self.version = 0  # reserved for future use; the class does not take this as a param.
@@ -277,7 +277,7 @@ class BlockHeader(Serializable):
     version: Final[int]
     summary: Final[BlockSummary]
     pow_evidence: Final[PowEvidence]
-    cached_hash: Final[str]
+    cached_hash: Final[bytes]
 
     def __init__(self, summary: BlockSummary, pow_evidence: PowEvidence):
         self.version = 0
