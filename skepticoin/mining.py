@@ -63,7 +63,7 @@ class Miner:
 
     def __call__(self) -> None:
         configure_logging_from_args(self.args)
-        self.send_message("info", "Starting mining: A repeat minter")
+        print(f"miner {self.miner_id}: starting a repeat minter")
 
         nonce = random.randrange(1 << 32)
 
@@ -76,10 +76,7 @@ class Miner:
                 nonce = (nonce + 1) % (1 << 32)
 
         except KeyboardInterrupt:
-            self.send_message("info", "KeyboardInterrupt")
-
-        finally:
-            self.send_message("info", "Done; waiting for Python-exit")
+            print(f"miner {self.miner_id} shutting down")
 
 
 class MinerWatcher:
@@ -181,7 +178,6 @@ class MinerWatcher:
         miner_id, message_type, data = queue_item
 
         message_handlers: Dict[str, Callable[[int, Any], None]] = {
-            "info": self.handle_info_message,
             "request_scrypt_input": self.handle_request_scrypt_input_message,
             "scrypt_output": self.handle_scrypt_output_message,
         }
@@ -218,9 +214,6 @@ class MinerWatcher:
             self.hash_stats[timestamp] = 0
 
         self.hash_stats[timestamp] += 1
-
-    def handle_info_message(self, miner_id: int, data: str) -> None:
-        print(f"miner {miner_id:2}: {data}")
 
     def handle_scrypt_output_message(self, miner_id: int, data: bytes) -> None:
         summary_hash: bytes = data
