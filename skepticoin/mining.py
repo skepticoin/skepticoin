@@ -56,10 +56,10 @@ class Miner:
 
         return data
 
-    def get_scrypt_input(self, nonce: int) -> Tuple[BlockSummary, int, bytes]:
+    def get_scrypt_input(self, nonce: int) -> Tuple[BlockSummary, int]:
         self.send_message("request_scrypt_input", nonce)
-        summary, current_height, public_key = self.wait_for_message("scrypt_input")
-        return summary, current_height, public_key
+        summary, current_height = self.wait_for_message("scrypt_input")
+        return summary, current_height
 
     def __call__(self) -> None:
         configure_logging_from_args(self.args)
@@ -69,7 +69,7 @@ class Miner:
 
         try:
             while True:
-                summary, current_height, public_key = self.get_scrypt_input(nonce)
+                summary, current_height = self.get_scrypt_input(nonce)
                 summary_hash = construct_summary_hash(summary, current_height)
                 self.send_message('scrypt_output', summary_hash)
 
@@ -194,17 +194,16 @@ class MinerWatcher:
 
     def handle_request_scrypt_input_message(self, miner_id: int, data: int) -> None:
         nonce: int = data
-        public_key: bytes = self.public_key
 
-        coinstate, transactions = self.network_thread.local_peer.chain_manager.get_state()
-        increasing_time = max(int(time()), coinstate.head().timestamp + 1)
+        self.coinstate, transactions = self.network_thread.local_peer.chain_manager.get_state()
+        increasing_time = max(int(time()), self.coinstate.head().timestamp + 1)
 
         summary, current_height, transactions = \
-            construct_block_pow_evidence_input(coinstate, transactions, SECP256k1PublicKey(public_key),
+            construct_block_pow_evidence_input(self.coinstate, transactions, SECP256k1PublicKey(self.public_key),
                                                increasing_time, b'', nonce)
 
         self.mining_args[miner_id] = summary, current_height, transactions
-        self.send_message(miner_id, "scrypt_input", (summary, current_height, public_key))
+        self.send_message(miner_id, "scrypt_input", (summary, current_height))
 
     def increment_hash_counter(self) -> None:
         timestamp = int(time())
