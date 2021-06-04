@@ -50,6 +50,10 @@ class Wallet:
         self.public_key_annotations[public_key] = annotation
         return public_key
 
+    def restore_annotated_public_key(self, public_key: bytes, annotation: str) -> None:
+        del self.public_key_annotations[public_key]
+        self.unused_public_keys.append(public_key)
+
     def generate_key(self) -> None:
         sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)
         private_key = sk.to_string()  # deceptive naming: to_string() actually returns a bytes object
