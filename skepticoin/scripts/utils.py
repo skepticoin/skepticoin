@@ -2,7 +2,6 @@ import json
 from io import BytesIO
 import zipfile
 import sys
-import requests
 import urllib.request
 from pathlib import Path
 from time import sleep, time
@@ -11,8 +10,6 @@ import os
 import tempfile
 import logging
 import argparse
-
-from requests.exceptions import RequestException
 
 from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
@@ -40,22 +37,18 @@ def initialize_peers_file() -> None:
     with open("peer_urls.txt", "r") as file:
         for url in file:
             print(f"downloading {url}")
-            try:
-                r = requests.get(url, timeout=1)
-                r.raise_for_status()
-            except RequestException:
-                continue
 
-            try:
-                peers = r.json()
-            except ValueError:
-                continue
-
-            for peer in peers:
-                if len(peer) != 3:
+            with urllib.request.urlopen(url, timeout=1) as resp:
+                try:
+                    peers = json.loads(resp.read())
+                except ValueError:
                     continue
 
-                all_peers.add(tuple(peer))  # type: ignore
+                for peer in peers:
+                    if len(peer) != 3:
+                        continue
+
+                    all_peers.add(tuple(peer))  # type: ignore
 
     print("Creating new peers.json")
     json.dump(list(list(peer) for peer in peers), open("peers.json", "w"))

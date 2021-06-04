@@ -3,4 +3,3 @@ pytest-mock
 immutables
 scrypt
 ecdsa
-requests
