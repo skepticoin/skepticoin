@@ -35,4 +35,6 @@ def main() -> None:
         datetime.fromtimestamp(coinstate.head().timestamp).isoformat())
 
     print("Waiting for networking thread to exit.")
-    thread.daemon = True
+    thread.stop()
+    thread.join()
+
