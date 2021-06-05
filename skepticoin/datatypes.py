@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import struct
-from typing import Any, BinaryIO, List, Optional, Final
+from typing import Any, BinaryIO, List, Optional
 
 from .humans import human
 from .serialization import (

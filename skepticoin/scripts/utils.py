@@ -70,7 +70,7 @@ def check_for_fresh_chain(thread: NetworkingThread) -> bool:
     return waited
 
 
-def read_chain_from_disk(max_fresh: int = None) -> CoinState:
+def read_chain_from_disk(max_fresh: Optional[int] = None) -> CoinState:
     if os.path.isfile('chain.cache'):
         print("Reading cached chain")
         with open('chain.cache', 'rb') as file:
