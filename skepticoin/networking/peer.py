@@ -804,6 +804,7 @@ class LocalPeer:
         ]
 
         self.logger = logging.getLogger("skepticoin.networking.%s" % self.nonce)
+        self.last_stats_output: str = ""
 
     def start_listening(self, port: int = PORT) -> None:
         self.port = port
@@ -932,7 +933,7 @@ class LocalPeer:
         self.logger.info("%15s LocalPeer.stop()" % "")
         self.running = False
 
-    def show_stats(self, suppressDuplicates: List[str] = [""]) -> None:
+    def show_stats(self) -> None:
         coinstate = self.chain_manager.coinstate
         assert coinstate
 
@@ -952,9 +953,9 @@ class LocalPeer:
                 out += "  diverges for %s blocks\n" % (head.height - lca.height)
             out += "\n"
 
-        if out != suppressDuplicates[0]:
+        if out != self.last_stats_output:
             print(out)
-            suppressDuplicates[0] = out
+            self.last_stats_output = out
 
     def show_network_stats(self) -> None:
         print("NETWORK")
