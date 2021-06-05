@@ -96,13 +96,17 @@ def read_chain_from_disk() -> CoinState:
         coinstate = coinstate.add_block_no_validation(block)
 
     if fresher_chain:
-        print("Caching chain for faster loading next time")
-        # Currently this takes about 2 seconds.
-        # It could be optimized further if we switch to an appendable file format for the cache.
-        with open('chain.cache', 'wb') as file:
-            coinstate.dump(lambda data: pickle.dump(data, file))
+        write_chain_cache_to_disk(coinstate)
 
     return coinstate
+
+
+def write_chain_cache_to_disk(coinstate: CoinState) -> None:
+    print("Caching chain for faster loading next time")
+    # Currently this takes about 2 seconds. It could be optimized further
+    # if we switch to an appendable file format for the cache.
+    with open('chain.cache', 'wb') as file:
+        coinstate.dump(lambda data: pickle.dump(data, file))
 
 
 def open_or_init_wallet() -> Wallet:
