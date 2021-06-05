@@ -8,6 +8,7 @@ from ipaddress import IPv6Address
 from threading import Lock
 from time import time
 from typing import Dict, List, Optional, Set, Tuple
+from sys import platform
 
 from skepticoin.coinstate import CoinState
 import random
@@ -884,6 +885,10 @@ class LocalPeer:
 
     def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
         self.logger.info("%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host)
+
+        if platform == 'win32' and len(self.selector.get_map()) >= 64:
+            # the client no longer works at all in Windows once we go over 64 connected peers
+            return
 
         server_addr = (disconnected_peer.host, disconnected_peer.port)
 
