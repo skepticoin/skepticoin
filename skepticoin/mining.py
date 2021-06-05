@@ -105,7 +105,7 @@ class Miner:
             while True:
                 current_second = int(time())
 
-                if current_second > last_round_second:
+                if current_second > last_round_second and not self.args.quiet:
                     self.send_message("hashes", (current_second, hashes))
                     last_round_second = current_second
                     hashes = 0
@@ -140,6 +140,7 @@ class MinerWatcher:
     def __init__(self) -> None:
         parser = DefaultArgumentParser()
         parser.add_argument('-n', default=1, type=int, help='number of miner instances')
+        parser.add_argument('--quiet', action='store_true', help='do not print stats to the console every second')
         self.args = parser.parse_args()
 
         self.queue: Queue = Queue()

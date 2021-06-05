@@ -7,7 +7,6 @@ share
 *.egg-info/
 dist
 skepticoin/scmversion.py
-
 __pycache__
 **/wallet.json 
 **/peers.json 
