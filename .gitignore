@@ -8,7 +8,7 @@ share
 dist
 skepticoin/scmversion.py
 __pycache__
-**/wallet.json
-**/peers.json
-**/chain/
+**/wallet.json 
+**/peers.json 
+**/chain/ 
 **/chain.cache
