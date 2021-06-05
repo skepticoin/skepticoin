@@ -27,7 +27,7 @@ def test_read_chain_from_disk():
     create_chain_dir()
 
     with cProfile.Profile() as pr:
-        coinstate = pr.runcall(lambda: read_chain_from_disk(max_fresh=5000))
+        coinstate = pr.runcall(read_chain_from_disk)
         pr.print_stats()
 
     with open('test.tmp', 'wb') as file:

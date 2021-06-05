@@ -70,7 +70,7 @@ def check_for_fresh_chain(thread: NetworkingThread) -> bool:
     return waited
 
 
-def read_chain_from_disk(max_fresh: Optional[int] = None) -> CoinState:
+def read_chain_from_disk() -> CoinState:
     if os.path.isfile('chain.cache'):
         print("Reading cached chain")
         with open('chain.cache', 'rb') as file:
@@ -82,7 +82,7 @@ def read_chain_from_disk(max_fresh: Optional[int] = None) -> CoinState:
 
     fresher_chain = sorted(os.listdir('chain'))[height:]
     print("Reading chain from disk, starting height=%d, fresher=%d" % (height, len(fresher_chain)))
-    for filename in fresher_chain[:max_fresh]:
+    for filename in fresher_chain:
         height = int(filename.split("-")[0])
         if height % 1000 == 0:
             print(filename)
