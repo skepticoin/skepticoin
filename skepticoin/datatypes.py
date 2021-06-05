@@ -125,6 +125,7 @@ class Output(Serializable):
 
 
 class Transaction(Serializable):
+
     def __init__(self, inputs: List[Input], outputs: List[Output]):
         self.version = 0  # reserved for future use; the class does not take this as a param.
         self.inputs = inputs

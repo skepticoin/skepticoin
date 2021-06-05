@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Callable
 
 import immutables
 
@@ -123,6 +123,25 @@ class CoinState:
         # block_hash -> (public_key -> (value, [OutputReference]))
         self.public_key_balances_by_hash = public_key_balances_by_hash
 
+    def dump(self, dumper: Callable[[Any], None]) -> None:
+        """
+        Dump the chain so that it can be loaded by the load() method later. Currently we only save the blocks.
+        It would be better to save the other stuff too, but that's not convenient right now.
+        DUMPER function must be passed as a parameter, to allow the calling code to control the actual file format.
+        """
+        dumper(self.block_by_hash)
+
+    @classmethod
+    def load(self, loader: Callable[[], Any]) -> CoinState:
+        "Faster way to load a previously dump()'d blockchain."
+        block_by_hash = loader()
+        coinstate = CoinState.zero()
+        sorted_blocks = list(block_by_hash.values())
+        sorted_blocks.sort(key=lambda block: block.height)  # type: ignore
+        for block in sorted_blocks:
+            coinstate = coinstate.add_block_no_validation(block)
+        return coinstate
+
     def __repr__(self) -> str:
         if self.current_chain_hash is None:
             return "CoinState @ empty"
@@ -164,42 +183,44 @@ class CoinState:
         # NOTE: ordering matters b/c we assign to unspent_transaction_outs; perhaps just distinguish?
         unspent_transaction_outs = uto_apply_block(unspent_transaction_outs, block)
 
-        block_by_hash: immutables.Map[bytes, Block] = self.block_by_hash.set(block.hash(), block)
+        block_hash = block.hash()
+
+        block_by_hash: immutables.Map[bytes, Block] = self.block_by_hash.set(block_hash, block)
 
         # TODO pruning of unspent_transaction_outs_by_hash on e.g. max delta-height; because it is used as part of
         # validation, such an approach implies a limit (to be implemented in validation) on how old a fork may be w.r.t.
         # the current height if it is to be considered at all.
         unspent_transaction_outs_by_hash = self.unspent_transaction_outs_by_hash.set(
-            block.hash(), unspent_transaction_outs)
+            block_hash, unspent_transaction_outs)
 
         public_key_balances_by_hash = self.public_key_balances_by_hash.set(
-            block.hash(), public_key_balances)
+            block_hash, public_key_balances)
 
         if block.previous_block_hash == b'\00' * 32:
             block_by_height_by_hash: immutables.Map[bytes, immutables.Map[int, Block]]
-            block_by_height_by_hash = immutables.Map({block.hash(): immutables.Map({0: block})})
+            block_by_height_by_hash = immutables.Map({block_hash: immutables.Map({0: block})})
         else:
             block_by_height = self.block_by_height_by_hash[block.previous_block_hash]
             block_by_height = block_by_height.set(block.height, block)
-            block_by_height_by_hash = self.block_by_height_by_hash.set(block.hash(), block_by_height)
+            block_by_height_by_hash = self.block_by_height_by_hash.set(block_hash, block_by_height)
 
         with self.heads.mutate() as mutable_heads:
             if block.previous_block_hash in mutable_heads:
                 del mutable_heads[block.header.summary.previous_block_hash]
 
-            mutable_heads[block.hash()] = block
+            mutable_heads[block_hash] = block
 
             heads = mutable_heads.finish()
 
         if self.current_chain_hash is None or self.current_chain_hash == block.previous_block_hash:
             # base case / simple moving ahead
-            current_chain_hash = block.hash()
+            current_chain_hash = block_hash
 
         # what should be the current_chain_hash in the case of forks?
         # we compare total work, using striclty greater: this means that when there is a fork in the chain, ties are
         # broken based on first-come-first serve. I'm sure someone wrote a paper on how this is optimal.
         elif block.get_total_work() > self.block_by_hash[self.current_chain_hash].get_total_work():
-            current_chain_hash = block.hash()
+            current_chain_hash = block_hash
         else:
             current_chain_hash = self.current_chain_hash  # a fork, but the most recently added block is non-current
 
