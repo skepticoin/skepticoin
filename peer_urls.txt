@@ -1,2 +1,2 @@
 https://pastebin.com/raw/CcfPX9mS
-http://skepticoin.s3.amazonaws.com/peers.json
+https://skepticoin.s3.amazonaws.com/peers.json
