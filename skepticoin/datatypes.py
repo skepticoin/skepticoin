@@ -126,10 +126,6 @@ class Output(Serializable):
 
 class Transaction(Serializable):
 
-    version: int
-    inputs: List[Input]
-    outputs: List[Output]
-
     def __init__(self, inputs: List[Input], outputs: List[Output]):
         self.version = 0  # reserved for future use; the class does not take this as a param.
         self.inputs = inputs
@@ -271,10 +267,6 @@ class BlockSummary(Serializable):
 
 
 class BlockHeader(Serializable):
-
-    version: int
-    summary: BlockSummary
-    pow_evidence: PowEvidence
 
     def __init__(self, summary: BlockSummary, pow_evidence: PowEvidence):
         self.version = 0
