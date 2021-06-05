@@ -126,16 +126,14 @@ class Output(Serializable):
 
 class Transaction(Serializable):
 
-    version: Final[int]
-    inputs: Final[List[Input]]
-    outputs: Final[List[Output]]
-    cached_hash: Final[bytes]
+    version: int
+    inputs: List[Input]
+    outputs: List[Output]
 
     def __init__(self, inputs: List[Input], outputs: List[Output]):
         self.version = 0  # reserved for future use; the class does not take this as a param.
         self.inputs = inputs
         self.outputs = outputs
-        self.cached_hash = sha256d(self.serialize())
 
     def __repr__(self) -> str:
         return "Transaction #%s" % human(self.hash())
@@ -161,7 +159,7 @@ class Transaction(Serializable):
         stream_serialize_list(f, self.outputs)
 
     def hash(self) -> bytes:
-        return self.cached_hash
+        return sha256d(self.serialize())
 
     def __hash__(self) -> int:
         return hash(self.hash())
@@ -274,16 +272,14 @@ class BlockSummary(Serializable):
 
 class BlockHeader(Serializable):
 
-    version: Final[int]
-    summary: Final[BlockSummary]
-    pow_evidence: Final[PowEvidence]
-    cached_hash: Final[bytes]
+    version: int
+    summary: BlockSummary
+    pow_evidence: PowEvidence
 
     def __init__(self, summary: BlockSummary, pow_evidence: PowEvidence):
         self.version = 0
         self.summary = summary
         self.pow_evidence = pow_evidence
-        self.cached_hash = sha256d(self.serialize())
 
     def __repr__(self) -> str:
         return "BlockHeader #%s" % human(self.hash())
@@ -312,7 +308,7 @@ class BlockHeader(Serializable):
         self.pow_evidence.stream_serialize(f)
 
     def hash(self) -> bytes:
-        return self.cached_hash
+        return sha256d(self.serialize())
 
 
 class Block(Serializable):
