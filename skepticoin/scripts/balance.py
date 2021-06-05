@@ -37,4 +37,3 @@ def main() -> None:
     print("Waiting for networking thread to exit.")
     thread.stop()
     thread.join()
-    
