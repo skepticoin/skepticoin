@@ -1,7 +1,7 @@
-CLOUD MINING
-============
+AWS CLOUD MINING EXTENSION
+==========================
 
-Skepticoin comes with a set of Cloud Formation Templates that mostly automate the deployment of miners to an Auto-Scaling Cluster on Amazon Web Services (AWS).
+This Skepticoin Extension enables the option to run Skepticoin Mining on the Amazon Web Services (AWS) cloud. The extension consists of a set of Cloud Formation Templates that automate the deployment of miners to a cluster of EC2 Instances managed by an Auto-Scaling Group.
 
 ## Why?
 
