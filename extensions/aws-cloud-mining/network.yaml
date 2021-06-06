@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Basic networking resources (VPC and minimal routes/gateways for Internet connectivity).
+
+Parameters:
+  SSHLocation:
+    Description: The IP address range that can be used to connect to the EC2 instances
+      by using SSH
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  ThirdSubnetAZ:
+    Description: Third AZ. Pick the one ending in "c" if present, otherwise pick "a".
+    Type: AWS::EC2::AvailabilityZone::Name
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock: 10.0.0.0/16
+      Tags:
+      - Key: Application
+        Value:
+          Ref: AWS::StackId
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Application
+        Value:
+          Ref: AWS::StackName
+      - Key: Network
+        Value: Public
+  GatewayToInternet:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+  SubnetRouteTableAssoc1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      SubnetId:
+        Ref: Subnet1
+  SubnetRouteTableAssoc2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      SubnetId:
+        Ref: Subnet2
+  SubnetRouteTableAssoc3:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: RouteTable
+      SubnetId:
+        Ref: Subnet3
+  InternetGatewayRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId:
+        Ref: RouteTable
+      GatewayId:
+        Ref: InternetGateway
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone: !Sub "${AWS::Region}a"
+      CidrBlock: 10.0.1.0/24
+      Tags:
+      - Key: Application
+        Value:
+          Ref: AWS::StackId
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone: !Sub "${AWS::Region}b"
+      CidrBlock: 10.0.2.0/24
+      Tags:
+      - Key: Application
+        Value:
+          Ref: AWS::StackId
+  Subnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      AvailabilityZone: !Ref ThirdSubnetAZ
+      CidrBlock: 10.0.3.0/24
+      Tags:
+      - Key: Application
+        Value:
+          Ref: AWS::StackId
+  AdminSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Enable SSH access via port 22 whitelist
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp:
+          Ref: SSHLocation
+
+Outputs:
+  VPC:
+    Description: VPC ID
+    Value:
+      Ref: VPC
+    Export:
+      Name: "skepticoin-vpc"
+  Subnet1:
+    Description: Subnet ID 1
+    Value:
+      Ref: Subnet1
+    Export:
+      Name: "skepticoin-subnet-1"
+  Subnet2:
+    Description: Subnet ID 2
+    Value:
+      Ref: Subnet2
+    Export:
+      Name: "skepticoin-subnet-2"
+  Subnet3:
+    Description: Subnet ID 3
+    Value:
+      Ref: Subnet3
+    Export:
+      Name: "skepticoin-subnet-3"
+  AdminSecurityGroup:
+    Description: SSH whitelist
+    Value:
+      Ref: AdminSecurityGroup
+    Export:
+      Name: "skepticoin-admin-sg"
