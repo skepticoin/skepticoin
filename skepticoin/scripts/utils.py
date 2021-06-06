@@ -1,10 +1,11 @@
+import json
 from io import BytesIO
 import zipfile
 import sys
 import urllib.request
 from pathlib import Path
 from time import sleep, time
-from typing import Any, Optional
+from typing import Any, Optional, Set, Tuple
 import os
 import tempfile
 import logging
@@ -29,11 +30,29 @@ class DefaultArgumentParser(argparse.ArgumentParser):
 
 
 def initialize_peers_file() -> None:
-    if not os.path.isfile("peers.json"):
-        print("Creating new peers.json")
-        with urllib.request.urlopen("https://pastebin.com/raw/CcfPX9mS") as response:
-            with open("peers.json", "wb") as f:
-                f.write(response.read())
+    if os.path.isfile("peers.json"):
+        return
+
+    all_peers: Set[Tuple[str, int, str]] = set()
+
+    with open("peer_urls.txt", "r") as file:
+        for url in file:
+            print(f"downloading {url}")
+
+            with urllib.request.urlopen(url, timeout=1) as resp:
+                try:
+                    peers = json.loads(resp.read())
+                except ValueError:
+                    continue
+
+                for peer in peers:
+                    if len(peer) != 3:
+                        continue
+
+                    all_peers.add(tuple(peer))  # type: ignore
+
+    print("Creating new peers.json")
+    json.dump(list(list(peer) for peer in peers), open("peers.json", "w"))
 
 
 def create_chain_dir() -> None:
