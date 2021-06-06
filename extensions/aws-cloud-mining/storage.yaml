@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Setup S3 buckets for skepticoin chain, peers.json, and wallet.
+  !!IMPORTANT!! The user (that's probably you) needs to manually upload the above files to S3 after deploying this template.
+  Upload the wallet to the private bucket, and the other two files to the public bucket.
+
+Parameters:
+  PublicBucketName:
+    Description: A public bucket for keeping and publishing the peers.json and chain.cache
+    Type: String
+    MinLength: '1'
+    Default: skepticoin
+
+Resources:
+
+  PublicBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Ref PublicBucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+    DeletionPolicy: Retain
+
+  PrivateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: BucketOwnerFullControl
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    DeletionPolicy: Retain
+
+  PublicBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties: 
+      Bucket: !Ref PublicBucket
+      PolicyDocument: {
+          "Version": "2012-10-17",
+          "Statement": [
+              {
+                  "Sid": "PublicReadGetObject",
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": [
+                      "s3:GetObject"
+                  ],
+                  "Resource": [
+                      !Sub "arn:aws:s3:::${PublicBucketName}/*"
+                  ]
+              }
+          ]
+      }
+
+Outputs:
+  PublicBucket:
+    Value: !Ref PublicBucket
+    Description: Name of PUBLIC bucket for peers.json and chain.cache
+    Export:
+      Name: PublicBucket
+  PrivateBucket:
+    Value: !Ref PrivateBucket
+    Description: Name of PRIVATE bucket for holding the wallet.json
+    Export:
+      Name: PrivateWalletBucket
+  PublicBucketSecureURL:
+    Value: !Join
+      - ''
+      - - 'https://'
+        - !GetAtt
+          - PublicBucket
+          - DomainName
+    Description: Name of public S3 bucket to hold peers.json and chain.cache
+  WebsiteURL:
+    Value: !GetAtt PublicBucket.WebsiteURL
+    Description: URL for website hosted on S3 containing peers.json and chain.cache (PUBLIC)

@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 
+  This template creates AWS EC2 instances for mining skepticoin.
+  The skepticoin miner is automatically installed and started on each EC2 instance.
+  Requires storage.yaml be deployed and wallet, peers, and chain files uploaded to S3 first.
+
+Parameters:
+  GitRepo:
+    Description: Skepticoin source git repository.
+    Type: String
+    Default: https://github.com/kryptocurrency/skepticoin
+  GitBranch:
+    Description: Skepticoin source git branch.
+    Type: String
+    Default: feature/cloud-mining
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: a1.medium
+    # Type       Region    Spot$   Hash Rate
+    # m5zn.large us-east-2 $0.0200 ~12-13
+    # c5.large   us-east-2 $0.0191 ~11
+    # c6g.medium us-east-2 $0.0100 ~10-11
+    # a1.medium  us-east-2 $0.0049 ~6-7    <-- BEST
+    # m1.small   us-east-1 $0.0044 ~2-3
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Description: For Graviton, change the x86_64 part to arm64.
+    AllowedValues:
+    - /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    - /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-arm64-gp2
+  AsgMaxSize:
+    Type: Number
+    Description: Number of EC2 instances to run.
+    Default: '1'
+  MaxPrice:
+    Type: Number
+    Description: The maximum hourly rate to pay for each EC2 instance.
+    Default: '0.01'
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of an existing EC2 key pair to enable SSH access to the ECS
+      instances
+
+Resources:
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+      - PolicyName: InlinePolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+              - autoscaling:SetInstanceHealth
+              Resource: '*'
+            - Effect: Allow
+              Action:
+              - s3:*
+              Resource: '*'
+              # !ImportValue "PrivateWalletBucket"
+              # !ImportValue "PublicBucket"
+
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: EC2InstanceRole
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !ImportValue "skepticoin-vpc"
+      GroupDescription: Enable  Skepticoin peering port 2412
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '2412'
+        ToPort: '2412'
+        CidrIp:
+          '0.0.0.0/0'
+
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          MountConfig:
+          - logs
+          - workload
+          - healthcheck
+        logs: # send logs to CloudWatch
+          files:
+            "/etc/cloudwatch-config.json":
+              content: !Sub |
+                {
+                    "agent": {
+                      "metrics_collection_interval": 60,
+                      "logfile": "/var/log/amazon-cloudwatch-agent.log"
+                    },
+                    "logs": {
+                      "logs_collected": {
+                        "files": {
+                          "collect_list": [{
+                            "file_path": "/var/log/skepticoin/*.log",
+                            "log_group_name": "/skepticoin/ec2/${AWS::StackName}"
+                          }]
+                        }
+                      }
+                    },
+                    "metrics":{
+                        "append_dimensions":{
+                          "AutoScalingGroupName":"${!aws:AutoScalingGroupName}",
+                          "ImageId":"${!aws:ImageId}",
+                          "InstanceId":"${!aws:InstanceId}",
+                          "InstanceType":"${!aws:InstanceType}"
+                        },
+                        "metrics_collected":{
+                          "mem":{
+                              "measurement":[
+                                "mem_used_percent"
+                              ]
+                          },
+                          "swap":{
+                              "measurement":[
+                                "swap_used_percent"
+                              ]
+                          }
+                        }
+                    }
+                  }
+          commands:
+            01_install:
+              command: "yum install -y amazon-cloudwatch-agent"
+            02_config:
+              command: "amazon-cloudwatch-agent-ctl -a append-config -c file:/etc/cloudwatch-config.json"
+            03_start:
+              command: "amazon-cloudwatch-agent-ctl -m ec2 -a start"
+        workload:
+          files:
+            "/home/ec2-user/workload":
+              content: !Sub |
+                #!/bin/bash -xe
+                cd /home/ec2-user
+                mkdir -p /var/log/skepticoin
+                LOG=/var/log/skepticoin/skepticoin-mine.log                
+                echo "InstanceType=${InstanceType}" >> $LOG
+                
+                # install python infrastructure
+                amazon-linux-extras install python3.8
+                /usr/bin/python3.8 -m venv ./venv
+                . ./venv/bin/activate
+                yum install -y "@Development tools" python3-pip python38-devel blas-devel gcc-gfortran lapack-devel
+                python3.8 -m pip install --upgrade pip
+
+                # install skepticoin from source
+                git clone --single-branch --branch ${GitBranch} ${GitRepo}
+                cd skepticoin
+                pip3.8 install -r requirements.txt
+                python3.8 setup.py install
+
+                # prepare skepticoin run-time environment
+                mkdir -p /tmp/skepticoin
+                cd /tmp/skepticoin
+                aws s3 cp s3://$PRIVATE_BUCKET/wallet.json .
+                aws s3 cp s3://$PUBLIC_BUCKET/peers.json .
+                aws s3 cp s3://$PUBLIC_BUCKET/chain.cache .
+
+                # supress automatic download of uncached chain
+                mkdir chain
+
+                # perform a balance operation first, to update the chain.cache and peers.json
+                PYTHONUNBUFFERED=1 skepticoin-balance >> $LOG 2>&1
+                aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.cache
+                aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include peers.json
+
+                # start mining
+                PYTHONUNBUFFERED=1 nohup skepticoin-mine --quiet >> $LOG 2>&1 &
+                echo "miner starting"
+              owner: ec2-user
+              group: ec2-user
+              mode: "000755"
+          commands:
+            01_start:
+              env:
+                PRIVATE_BUCKET: !ImportValue "PrivateWalletBucket"
+                PUBLIC_BUCKET: !ImportValue "PublicBucket"
+              command: /home/ec2-user/workload
+        healthcheck:
+          files:
+            "/tmp/healthcheck":
+              content: !Sub |
+                */15 * * * * nc -zv 127.0.0.1 2412 || aws autoscaling set-instance-health --region ${AWS::Region} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --health-status Unhealthy
+          commands:
+            01_install:
+              command: "yum install -y nc"
+            02_crontab:
+              command: "crontab /tmp/healthcheck"            
+
+    Properties:
+      AssociatePublicIpAddress: true
+      ImageId: !Ref LatestAmiId      
+      InstanceType:
+        Ref: InstanceType
+      KeyName:
+        Ref: KeyName
+      SecurityGroups:
+      - Ref: InstanceSecurityGroup
+      - !ImportValue "skepticoin-admin-sg"
+      IamInstanceProfile:
+        Ref: EC2InstanceProfile
+      SpotPrice: !Ref MaxPrice
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum install -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --configsets MountConfig --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+        Count:
+          Ref: AsgMaxSize
+    Properties:
+      VPCZoneIdentifier: 
+      - !ImportValue "skepticoin-subnet-1"
+      - !ImportValue "skepticoin-subnet-2"
+      - !ImportValue "skepticoin-subnet-3"
+      LaunchConfigurationName:
+        Ref: LaunchConfiguration
+      MinSize: '1'
+      MaxSize:
+        Ref: AsgMaxSize
+      DesiredCapacity:
+        Ref: AsgMaxSize
+      Tags:
+      - Key: Name
+        Value: skepticoin-miner
+        PropagateAtLaunch: 'true'
