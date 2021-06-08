@@ -5,7 +5,7 @@ import sys
 import urllib.request
 from pathlib import Path
 from time import sleep, time
-from typing import Any, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple
 import os
 import tempfile
 import logging
@@ -18,6 +18,11 @@ from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
 from skepticoin.networking.peer import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
+
+PEER_URLS: List[str] = [
+    "https://pastebin.com/raw/CcfPX9mS",
+    "https://skepticoin.s3.amazonaws.com/peers.json",
+]
 
 
 class DefaultArgumentParser(argparse.ArgumentParser):
@@ -35,21 +40,20 @@ def initialize_peers_file() -> None:
 
     all_peers: Set[Tuple[str, int, str]] = set()
 
-    with open("peer_urls.txt", "r") as file:
-        for url in file:
-            print(f"downloading {url}")
+    for url in PEER_URLS:
+        print(f"downloading {url}")
 
-            with urllib.request.urlopen(url, timeout=1) as resp:
-                try:
-                    peers = json.loads(resp.read())
-                except ValueError:
+        with urllib.request.urlopen(url, timeout=1) as resp:
+            try:
+                peers = json.loads(resp.read())
+            except ValueError:
+                continue
+
+            for peer in peers:
+                if len(peer) != 3:
                     continue
 
-                for peer in peers:
-                    if len(peer) != 3:
-                        continue
-
-                    all_peers.add(tuple(peer))  # type: ignore
+                all_peers.add(tuple(peer))  # type: ignore
 
     print("Creating new peers.json")
     json.dump(list(list(peer) for peer in peers), open("peers.json", "w"))
