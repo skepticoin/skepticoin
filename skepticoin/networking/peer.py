@@ -8,7 +8,7 @@ from ipaddress import IPv6Address
 from threading import Lock
 from time import time
 from typing import Dict, List, Optional, Set, Tuple
-from sys import platform
+import sys
 
 from skepticoin.coinstate import CoinState
 import random
@@ -65,6 +65,11 @@ MAGIC = b'MAJI'
 
 INCOMING = "INCOMING"
 OUTGOING = "OUTGOING"
+
+MAX_SELECTOR_SIZE_BY_PLATFORM: Dict[str, int] = {
+    "win32": 64,
+    "linux": 512,
+}
 
 
 def _new_context() -> int:
@@ -465,7 +470,10 @@ class ConnectedRemotePeer(RemotePeer):
             self.start_sending()
 
     def start_sending(self) -> None:
-        self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
+        try:
+            self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
+        except ValueError:
+            self.local_peer.logger.error("%15s ConnectedRemotePeer.start_sending() ValueError" % (self.host))
 
     def stop_sending(self) -> None:
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
@@ -886,8 +894,11 @@ class LocalPeer:
     def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
         self.logger.info("%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host)
 
-        if platform == 'win32' and len(self.selector.get_map()) >= 64:
-            # the client no longer works at all in Windows once we go over 64 connected peers
+        max_selector_map_size = MAX_SELECTOR_SIZE_BY_PLATFORM.get(sys.platform, 64)
+
+        if len(self.selector.get_map()) >= max_selector_map_size:
+            # We hit the platform-dependent limit of connected peers
+            # TODO this is actually a hack, find a proper solution
             return
 
         server_addr = (disconnected_peer.host, disconnected_peer.port)
