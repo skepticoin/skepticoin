@@ -63,12 +63,9 @@ def create_chain_dir() -> None:
     if not os.path.exists('chain'):
         print("Pre-download blockchain from trusted source to 'blockchain-master'")
         with urllib.request.urlopen("https://github.com/skepticoin/blockchain/archive/refs/heads/master.zip") as resp:
-            with zipfile.ZipFile(BytesIO(resp.read())) as zip_ref:
-                print("Extracting...")
-                zip_ref.extractall()
-
-        print("Created new directory for chain")
-        os.rename('blockchain-master', 'chain')
+            with open('chain.zip', 'wb') as outfile:
+                outfile.write(resp.read())
+        os.mkdir('chain')
 
 
 def check_for_fresh_chain(thread: NetworkingThread) -> bool:
@@ -99,6 +96,25 @@ def read_chain_from_disk() -> CoinState:
         with open('chain.cache', 'rb') as file:
             coinstate = CoinState.load(lambda: pickle.load(file))
             height = len(coinstate.block_by_hash)
+    elif os.path.isfile('chain.zip'):
+        print("Reading initial chain from zipfile")
+        coinstate = CoinState.zero()
+        with zipfile.ZipFile('chain.zip') as zip:
+            for entry in zip.infolist():
+                if not entry.is_dir():
+                    filename = entry.filename.split('/')[1]
+                    height = int(filename.split("-")[0])
+                    if height % 1000 == 0:
+                        print(filename)
+
+                    try:
+                        data = zip.read(entry)
+                        block = Block.stream_deserialize(BytesIO(data))
+                    except Exception as e:
+                        raise Exception("Corrupted block on disk: %s" % filename) from e
+
+                    coinstate = coinstate.add_block_no_validation(block)
+
     else:
         coinstate = CoinState.zero()
         height = 0
