@@ -473,8 +473,7 @@ class ConnectedRemotePeer(RemotePeer):
         try:
             self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
         except ValueError:
-            # TODO Invalid file descriptor: -1 happens here
-            pass
+            self.local_peer.logger.error("%15s ConnectedRemotePeer.start_sending() ValueError" % (self.host))
 
     def stop_sending(self) -> None:
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
