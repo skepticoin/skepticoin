@@ -101,6 +101,8 @@ class MinerWatcher:
         self.public_key: bytes
 
     def __call__(self) -> None:
+        configure_logging_from_args(self.args)
+
         create_chain_dir()
         self.coinstate = read_chain_from_disk()
 
