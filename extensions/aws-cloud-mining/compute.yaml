@@ -203,11 +203,11 @@ Resources:
             "/tmp/crontab":
               # Crontab contents explanation:
               # - Every 15 minutes check to see if skepticoin-mine is still listening on port 2412. When it's not, it's assumed to have crashed, and the node is taken out.
-              # - Every 8 hours, copy the up-to-date local peers.json back into the public S3 bucket. It'll be overwritten by each node, which is inefficient but fine.
+              # - Every hour, copy the up-to-date local peers.json back into the public S3 bucket. It'll be overwritten by each node, which is inefficient but fine.
               content: !Sub
                 - |
                   */15 * * * * nc -zv 127.0.0.1 2412 || aws autoscaling set-instance-health --region ${AWS::Region} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --health-status Unhealthy
-                  0 */8 * * * aws s3 sync . s3://${PUBLIC_BUCKET}/ --exclude "*" --include peers.json
+                  0 * * * * cd /tmp/skepticoin && aws s3 sync . s3://${PUBLIC_BUCKET}/ --exclude "*" --include peers.json
                 - PUBLIC_BUCKET: !ImportValue "PublicBucket"
           commands:
             01_install:

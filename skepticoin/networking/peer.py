@@ -9,6 +9,7 @@ from threading import Lock
 from time import time
 from typing import Dict, List, Optional, Set, Tuple
 import sys
+import os
 
 from skepticoin.coinstate import CoinState
 import random
@@ -125,15 +126,22 @@ class NetworkManager(Manager):
             del self.disconnected_peers[key]
         self._sanity_check()
 
-    def handle_peer_disconnected(self, remote_peer: DisconnectedRemotePeer) -> None:
+    def handle_peer_disconnected(self, remote_peer: ConnectedRemotePeer) -> None:
         self.local_peer.logger.info("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
 
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
 
         self._sanity_check()
-        if remote_peer.direction == OUTGOING:
-            self.disconnected_peers[key] = remote_peer
+
         del self.connected_peers[key]
+
+        if remote_peer.direction == OUTGOING:
+            if remote_peer.hello_received:
+                self.disconnected_peers[key] = remote_peer.as_disconnected()
+            else:
+                print('Bad Peer (disconnected without hello): ' + remote_peer.host)
+                self.local_peer.disk_interface.overwrite_peers(list(self.connected_peers.values()))
+
         self._sanity_check()
 
     def get_active_peers(self) -> List[ConnectedRemotePeer]:
@@ -545,7 +553,7 @@ class ConnectedRemotePeer(RemotePeer):
             self.local_peer.network_manager.my_addresses.add((self.host, self.port))
             self.local_peer.disconnect(self, "connection to self")
 
-        self.local_peer.disk_interface.update_peer_db(self)
+        self.local_peer.disk_interface.overwrite_peers(list(self.local_peer.network_manager.connected_peers.values()))
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
@@ -777,19 +785,14 @@ class DiskInterface:
         with open('chain/%s' % block_filename(block), 'wb') as f:
             f.write(block.serialize())
 
-    def update_peer_db(self, remote_peer: RemotePeer) -> None:
-        if remote_peer.direction != OUTGOING:
-            return
-
-        # TSTTCPW... really quite barebones like this :-D
-        db = [tuple(li) for li in json.loads(open("peers.json").read())]
-
-        tup = (remote_peer.host, remote_peer.port, remote_peer.direction)
-        if tup not in db:
-            db.append(tup)
-
-        with open("peers.json", "w") as f:
-            json.dump(db, f, indent=4)
+    def overwrite_peers(self, peers: List[ConnectedRemotePeer]) -> None:
+        db = [(remote_peer.host, remote_peer.port, remote_peer.direction)
+              for remote_peer in peers if remote_peer.direction == OUTGOING and remote_peer.hello_received]
+        if db:
+            with open("peers.json", "w") as f:
+                json.dump(db, f, indent=4)
+        else:
+            os.remove("peers.json")
 
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
@@ -883,7 +886,7 @@ class LocalPeer:
         try:
             self.selector.unregister(remote_peer.sock)
             remote_peer.sock.close()
-            self.network_manager.handle_peer_disconnected(remote_peer.as_disconnected())
+            self.network_manager.handle_peer_disconnected(remote_peer)
         except Exception as e:
             # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
             # (i.e. the whole business of unregistering things that are already in some half-baked state)

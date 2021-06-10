@@ -24,7 +24,7 @@ class FakeDiskInterface:
     def save_block(self, block):
         pass
 
-    def update_peer_db(self, remote_peer):
+    def overwrite_peers(self, remote_peers):
         pass
 
     def save_transaction_for_debugging(self, transaction):
