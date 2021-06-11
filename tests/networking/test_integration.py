@@ -15,7 +15,7 @@ from skepticoin.datatypes import Block, Transaction, Input, Output, OutputRefere
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.messages import InventoryMessage
 from skepticoin.networking.threading import NetworkingThread
-from skepticoin.networking.peer import load_peers_from_list
+from skepticoin.networking.remote_peer import load_peers_from_list
 
 CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("../testdata/chain")
 
@@ -92,8 +92,8 @@ def test_broadcast_transaction(caplog, mocker):
     # just testing the basics: is a broadcast transaction stored in the transaction pool on the other side?
 
     # By turning off transaction-validation, we can use an invalid transaction in this test.
-    mocker.patch("skepticoin.networking.peer.validate_non_coinbase_transaction_by_itself")
-    mocker.patch("skepticoin.networking.peer.validate_non_coinbase_transaction_in_coinstate")
+    mocker.patch("skepticoin.networking.manager.validate_non_coinbase_transaction_by_itself")
+    mocker.patch("skepticoin.networking.manager.validate_non_coinbase_transaction_in_coinstate")
 
     caplog.set_level(logging.INFO)
 

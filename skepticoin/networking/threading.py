@@ -3,7 +3,7 @@ from typing import Optional
 
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.params import PORT
-from skepticoin.networking.peer import DiskInterface, LocalPeer
+from skepticoin.networking.local_peer import DiskInterface, LocalPeer
 
 
 class NetworkingThread(Thread):
