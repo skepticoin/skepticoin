@@ -332,7 +332,6 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
         for potential_start_hash in message.potential_start_hashes:
             self.local_peer.logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
-            assert coinstate
             if potential_start_hash in coinstate.block_by_hash:
                 start_height = coinstate.block_by_hash[potential_start_hash].height + 1  # + 1: sent hash is last known
                 if start_height not in coinstate.by_height_at_head():
@@ -346,7 +345,6 @@ class ConnectedRemotePeer(RemotePeer):
                     break
         else:  # no break
             start_height = 1  # genesis is last known
-        assert coinstate
         max_height = coinstate.head().height + 1  # + 1: range is exclusive, but we need to send this last block also
         items = [
             InventoryItem(DATA_BLOCK, coinstate.by_height_at_head()[height].hash())
@@ -408,7 +406,6 @@ class ConnectedRemotePeer(RemotePeer):
 
     def check_inventory_messages(self) -> None:
         coinstate = self.local_peer.chain_manager.coinstate
-        assert coinstate
 
         msg_state, next_hash = self._get_hash_from_inventory_messages()
         while next_hash is not None and next_hash in coinstate.block_by_hash:
@@ -428,7 +425,6 @@ class ConnectedRemotePeer(RemotePeer):
             raise NotImplementedError("We can only deal w/ DATA_BLOCK GetDataMessage objects for now")
 
         coinstate = self.local_peer.chain_manager.coinstate
-        assert coinstate
 
         if get_data_message.hash not in coinstate.block_by_hash:
             # we simply silently ignore GetDataMessage for hashes we don't have... future work: inc banscore, or ...
@@ -461,7 +457,6 @@ class ConnectedRemotePeer(RemotePeer):
 
         block: Block = message.data  # type: ignore
         coinstate = self.local_peer.chain_manager.coinstate
-        assert coinstate
 
         if block.hash() in coinstate.block_by_hash:
             # implicit here: when you receive a datamessage, this could be because you requested it; and thus you'll
