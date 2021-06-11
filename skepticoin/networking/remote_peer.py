@@ -324,7 +324,7 @@ class ConnectedRemotePeer(RemotePeer):
             self.local_peer.network_manager.my_addresses.add((self.host, self.port))
             self.local_peer.disconnect(self, "connection to self")
 
-        self.local_peer.disk_interface.update_peer_db(self)
+        self.local_peer.disk_interface.overwrite_peers(list(self.local_peer.network_manager.connected_peers.values()))
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)

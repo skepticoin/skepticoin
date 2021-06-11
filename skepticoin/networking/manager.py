@@ -84,15 +84,22 @@ class NetworkManager(Manager):
             del self.disconnected_peers[key]
         self._sanity_check()
 
-    def handle_peer_disconnected(self, remote_peer: DisconnectedRemotePeer) -> None:
+    def handle_peer_disconnected(self, remote_peer: ConnectedRemotePeer) -> None:
         self.local_peer.logger.info("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
 
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
 
         self._sanity_check()
-        if remote_peer.direction == OUTGOING:
-            self.disconnected_peers[key] = remote_peer
+
         del self.connected_peers[key]
+
+        if remote_peer.direction == OUTGOING:
+            if remote_peer.hello_received:
+                self.disconnected_peers[key] = remote_peer.as_disconnected()
+            else:
+                print('Bad Peer (disconnected without hello): ' + remote_peer.host)
+                self.local_peer.disk_interface.overwrite_peers(list(self.connected_peers.values()))
+
         self._sanity_check()
 
     def get_active_peers(self) -> List[ConnectedRemotePeer]:

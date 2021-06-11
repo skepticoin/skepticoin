@@ -147,6 +147,9 @@ class MinerWatcher:
             pass
 
         finally:
+            print("Restoring unused public key")
+            self.wallet.restore_annotated_public_key(self.public_key, "reserved for potentially mined block")
+
             print("Stopping networking thread")
             self.network_thread.stop()
 

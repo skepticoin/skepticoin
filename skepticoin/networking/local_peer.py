@@ -1,5 +1,6 @@
 
 import logging
+import os
 import random
 import selectors
 import socket
@@ -7,12 +8,12 @@ import traceback
 import sys
 from datetime import datetime
 
-from typing import Optional
+from typing import List, Optional
 from skepticoin.humans import human
 from skepticoin.utils import block_filename
 from skepticoin.datatypes import Block, Transaction
 from skepticoin.networking.remote_peer import (
-    RemotePeer, ConnectedRemotePeer, DisconnectedRemotePeer, LISTENING_SOCKET, OUTGOING, IRRELEVANT, INCOMING
+    ConnectedRemotePeer, DisconnectedRemotePeer, LISTENING_SOCKET, OUTGOING, IRRELEVANT, INCOMING
 )
 from skepticoin.networking.params import PORT
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
@@ -36,19 +37,14 @@ class DiskInterface:
         with open('chain/%s' % block_filename(block), 'wb') as f:
             f.write(block.serialize())
 
-    def update_peer_db(self, remote_peer: RemotePeer) -> None:
-        if remote_peer.direction != OUTGOING:
-            return
-
-        # TSTTCPW... really quite barebones like this :-D
-        db = [tuple(li) for li in json.loads(open("peers.json").read())]
-
-        tup = (remote_peer.host, remote_peer.port, remote_peer.direction)
-        if tup not in db:
-            db.append(tup)
-
-        with open("peers.json", "w") as f:
-            json.dump(db, f, indent=4)
+    def overwrite_peers(self, peers: List[ConnectedRemotePeer]) -> None:
+        db = [(remote_peer.host, remote_peer.port, remote_peer.direction)
+              for remote_peer in peers if remote_peer.direction == OUTGOING and remote_peer.hello_received]
+        if db:
+            with open("peers.json", "w") as f:
+                json.dump(db, f, indent=4)
+        else:
+            os.remove("peers.json")
 
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
@@ -142,7 +138,7 @@ class LocalPeer:
         try:
             self.selector.unregister(remote_peer.sock)
             remote_peer.sock.close()
-            self.network_manager.handle_peer_disconnected(remote_peer.as_disconnected())
+            self.network_manager.handle_peer_disconnected(remote_peer)
         except Exception as e:
             # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
             # (i.e. the whole business of unregistering things that are already in some half-baked state)
