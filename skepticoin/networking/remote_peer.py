@@ -377,7 +377,7 @@ class ConnectedRemotePeer(RemotePeer):
 
     def _get_hash_from_inventory_messages(
         self,
-    ) -> Tuple[Optional[InventoryMessageState], Optional[bytes]]:
+    ) -> Optional[Tuple[InventoryMessageState, bytes]]:
         while self.inventory_messages:
             msg_state = self.inventory_messages[0]
 
@@ -402,21 +402,23 @@ class ConnectedRemotePeer(RemotePeer):
 
             self.inventory_messages.pop(0)
 
-        return None, None
+        return None
 
     def check_inventory_messages(self) -> None:
         coinstate = self.local_peer.chain_manager.coinstate
 
-        msg_state, next_hash = self._get_hash_from_inventory_messages()
-        while next_hash is not None and next_hash in coinstate.block_by_hash:
-            msg_state, next_hash = self._get_hash_from_inventory_messages()
+        while True:
+            tup = self._get_hash_from_inventory_messages()
 
-        if next_hash is None or next_hash in coinstate.block_by_hash:
-            return
+            if not tup:
+                return
 
-        assert msg_state
-        msg_state.actually_used = True
-        self.send_message(GetDataMessage(DATA_BLOCK, next_hash), prev_header=msg_state.header)
+            msg_state, next_hash = tup
+
+            if next_hash not in coinstate.block_by_hash:
+                msg_state.actually_used = True
+                self.send_message(GetDataMessage(DATA_BLOCK, next_hash), prev_header=msg_state.header)
+                return
 
     def handle_get_data_message_received(
         self, header: MessageHeader, get_data_message: GetDataMessage
