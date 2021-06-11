@@ -102,8 +102,7 @@ class LocalPeer:
         # self.logger.info("LocalPeer.handle_remote_peer_selector_event()")
 
         sock: socket.socket = key.fileobj  # type: ignore
-        remote_peer = key.data
-        assert isinstance(remote_peer, ConnectedRemotePeer)
+        remote_peer: ConnectedRemotePeer = key.data
 
         try:
             if mask & selectors.EVENT_READ:
