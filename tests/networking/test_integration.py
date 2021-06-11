@@ -92,8 +92,8 @@ def test_broadcast_transaction(caplog, mocker):
     # just testing the basics: is a broadcast transaction stored in the transaction pool on the other side?
 
     # By turning off transaction-validation, we can use an invalid transaction in this test.
-    mocker.patch("skepticoin.networking.peer.validate_non_coinbase_transaction_by_itself")
-    mocker.patch("skepticoin.networking.peer.validate_non_coinbase_transaction_in_coinstate")
+    mocker.patch("skepticoin.networking.manager.validate_non_coinbase_transaction_by_itself")
+    mocker.patch("skepticoin.networking.manager.validate_non_coinbase_transaction_in_coinstate")
 
     caplog.set_level(logging.INFO)
 
