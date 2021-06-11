@@ -16,7 +16,7 @@ from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
-from skepticoin.networking.peer import load_peers
+from skepticoin.networking.remote_peer import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 
 PEER_URLS: List[str] = [
