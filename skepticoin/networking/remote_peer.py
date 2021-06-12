@@ -1,5 +1,6 @@
 from __future__ import annotations
 from io import BytesIO
+import traceback
 
 from ipaddress import IPv6Address
 
@@ -24,6 +25,7 @@ from .params import (
 from skepticoin.datatypes import Block, Transaction
 from skepticoin.networking.params import MAX_MESSAGE_SIZE
 from .messages import (
+    DATATYPES,
     SupportedVersion,
     MessageHeader,
     Message,
@@ -235,10 +237,12 @@ class ConnectedRemotePeer(RemotePeer):
             in_response_to, context = prev_header.id, prev_header.context
         header = MessageHeader(int(time()), self._get_msg_id(), in_response_to=in_response_to, context=context)
 
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.send_message(%s %s)" % (self.host, type(message).__name__, header.format()))
-
         data = header.serialize() + message.serialize()
+
+        self.local_peer.logger.info(
+            "%15s ConnectedRemotePeer.send_message(%s %s len=%d)"
+            % (self.host, type(message).__name__, header.format(), len(data)))
+
         self.send_backlog.append((MAGIC + struct.pack(b">I", len(data)) + data))
 
         self.check_message_backlog()
@@ -252,7 +256,8 @@ class ConnectedRemotePeer(RemotePeer):
         try:
             self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
         except ValueError:
-            self.local_peer.logger.error("%15s ConnectedRemotePeer.start_sending() ValueError" % (self.host))
+            self.local_peer.logger.error("%15s ConnectedRemotePeer.start_sending() ValueError: %s\n"
+                                         % (self.host, traceback.format_exc()))
 
     def stop_sending(self) -> None:
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
@@ -288,7 +293,8 @@ class ConnectedRemotePeer(RemotePeer):
         raise NotImplementedError("%s" % message)
 
     def handle_can_send(self, sock: socket.socket) -> None:
-        self.local_peer.logger.info("ConnectedRemotePeer.handle_can_send()")
+        self.local_peer.logger.info("ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)"
+                                    % (len(self.send_buffer), len(self.send_backlog)))
 
         sent = sock.send(self.send_buffer)
         self.send_buffer = self.send_buffer[sent:]
@@ -350,14 +356,15 @@ class ConnectedRemotePeer(RemotePeer):
             InventoryItem(DATA_BLOCK, coinstate.by_height_at_head()[height].hash())
             for height in range(start_height, min(start_height + GET_BLOCKS_INVENTORY_SIZE, max_height))
         ]
-        self.local_peer.logger.debug("%15s ... returning from %s, %s items" % (self.host, start_height, len(items)))
+        self.local_peer.logger.info("%15s ... returning from start_height=%d, %d items"
+                                    % (self.host, start_height, len(items)))
         self.send_message(InventoryMessage(items), prev_header=header)
 
     def handle_inventory_message_received(
         self, header: MessageHeader, message: InventoryMessage
     ) -> None:
         self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_inventory_message_received(%s)" % (self.host, len(message.items)))
+            "%15s ConnectedRemotePeer.handle_inventory_message_received(%d)" % (self.host, len(message.items)))
         if len(message.items) > 0:
             self.local_peer.logger.info(
                 "%15s %s .. %s" % (self.host, human(message.items[0].hash), human(message.items[-1].hash)))
@@ -441,8 +448,9 @@ class ConnectedRemotePeer(RemotePeer):
         self.send_message(data_message, prev_header=header)
 
     def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_data_message_received(%s %s)" % (
-            self.host, str(message.data_type), header.format()))
+        self.local_peer.logger.info(
+            "%15s ConnectedRemotePeer.handle_data_message_received(type=%s format=%s)" % (
+             self.host, str(DATATYPES[message.data_type]), header.format()))
 
         if message.data_type == DATA_BLOCK:
             return self.handle_block_received(header, message)
@@ -458,6 +466,7 @@ class ConnectedRemotePeer(RemotePeer):
         # TODO deal with out-of-order blocks more gracefully
 
         block: Block = message.data  # type: ignore
+
         coinstate = self.local_peer.chain_manager.coinstate
 
         if block.hash() in coinstate.block_by_hash:

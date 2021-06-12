@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import struct
 from ipaddress import IPv6Address
 from typing import Dict, List, Type, BinaryIO
@@ -71,7 +72,9 @@ class MessageHeader(Serializable):
         f.write(b'\x00' * 32)  # reserved space for later versions
 
     def format(self) -> str:
-        return "t%010d-i%010d-r%010d-c%020d" % (self.timestamp, self.id, self.in_response_to, self.context)
+        return "ts: %s, id: %010d, req: %010d, ctx: %020d" % (
+            datetime.datetime.fromtimestamp(self.timestamp).astimezone().isoformat(),
+            self.id, self.in_response_to, self.context)
 
 
 class Message(Serializable):
