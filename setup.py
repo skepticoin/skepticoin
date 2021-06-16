@@ -35,6 +35,7 @@ setup(
             'skepticoin-repl=skepticoin.scripts.repl:main',
             'skepticoin-run=skepticoin.scripts.run:main',
             'skepticoin-balance=skepticoin.scripts.balance:main',
+            'skepticoin-gui=skepticoin.scripts.gui:main',
         ],
     },
 
