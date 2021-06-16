@@ -1,5 +1,5 @@
-pytest
-pytest-mock
-immutables
-scrypt
-ecdsa
+ecdsa==0.16.1
+immutables==0.15
+pytest-mock==3.6.1
+pytest==6.2.4
+scrypt==0.8.18
