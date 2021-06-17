@@ -1,5 +1,5 @@
 # Load the browser side of the GUI. 100% totally temporary code to demonstrate the architecture.
-WEB_APP_LOADER = """
+WEB_APP_LOADER: str = """
 <html>
 <head>
 <script>
@@ -17,19 +17,22 @@ function showWallet() {
     // simple function to demonstrate API call with browser-side processing
     fetch('/wallet')
         .then((response) => response.json())
-        .then(data => document.getElementById("result").innerHTML += 'Your wallet has this many keys: ' + data + "<br>")
+        .then(data => document.getElementById("result").innerHTML +=
+            'Your wallet has this many keys: ' + data.size + "<br>")
 }
 function showHeight() {
     // simple function to demonstrate API call with browser-side processing
     fetch('/height')
         .then((response) => response.json())
-        .then(data => document.getElementById("result").innerHTML += 'Your current blockchain height: ' + data + "<br>")
+        .then(data => document.getElementById("result").innerHTML +=
+            'Your current blockchain height: ' + data.height + "<br>")
 }
 </script>
 </head>
 <body>
 (please don't click these until initialization is complete):
 <a href="javascript:showWallet()">show wallet</a> | <a href="javascript:showHeight()">show height</a>
+<p>IMPORTANT: Do not launch more than one browser window.</p>
 <div id="result">Loading...</div>
 </body>
 </html>

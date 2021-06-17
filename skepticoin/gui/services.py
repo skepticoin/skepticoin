@@ -1,4 +1,3 @@
-from typing import Tuple
 from skepticoin.wallet import Wallet
 from threading import Thread
 
@@ -12,22 +11,12 @@ from skepticoin.scripts.utils import (
     DefaultArgumentParser,
 )
 
-from .http_handler import HttpHandler
-from .web_app_loader import WEB_APP_LOADER
 
-
-class StatefulServices():
+class SkepticoinService():
 
     def __init__(self) -> None:
 
         self.event_queue = ['Initializing']
-
-        self.actions = {
-            '/': self.web_app_loader,
-            '/wallet': self.get_wallet,
-            '/height': self.get_chain_height,
-            '/event-stream': self.event_stream,
-        }
 
         initThread = Thread(target=lambda: self.run())
         initThread.start()
@@ -54,17 +43,3 @@ class StatefulServices():
         self.event_queue.append('Waiting for Fresh Chain')
         check_for_fresh_chain(self.thread)
         self.event_queue.append("Chain up to date")
-
-    def event_stream(self, handler: HttpHandler) -> Tuple[int, str, str]:
-        msg = self.event_queue.pop() if self.event_queue else 'Nothing Is Happening'
-        return (200, 'text/event-stream', 'data: %s\n\n' % msg)
-
-    def get_wallet(self, handler: HttpHandler) -> Tuple[int, str, str]:
-        return (200, 'application/json', str(len(self.wallet.keypairs)))
-
-    def get_chain_height(self, handler: HttpHandler) -> Tuple[int, str, str]:
-        height = len(self.thread.local_peer.chain_manager.coinstate.block_by_hash)
-        return (200, 'application/json', str(height))
-
-    def web_app_loader(self, handler: HttpHandler) -> Tuple[int, str, str]:
-        return (200, "text/html", WEB_APP_LOADER)

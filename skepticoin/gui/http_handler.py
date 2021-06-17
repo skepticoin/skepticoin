@@ -1,33 +1,42 @@
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-import traceback
-from typing import Callable, Dict
+from typing import Dict, Tuple
+from flask import Flask
+from .services import SkepticoinService
+from .web_app_loader import WEB_APP_LOADER
 
 
-class HttpHandler(BaseHTTPRequestHandler):
+app = Flask(__name__)
+skeptis = SkepticoinService()
 
-    actions: Dict[str, Callable] = {}
 
-    server_address = ('127.0.0.1', 2411)
+@app.route("/")
+def webRoot() -> str:
+    return WEB_APP_LOADER  # type: ignore #  mypy bug!?
 
-    def do_GET(self):  # type: ignore
-        try:
-            if self.path in HttpHandler.actions:
-                action = HttpHandler.actions[self.path]
-                (response_code, content_type, body) = action(self)
-            else:
-                (response_code, content_type, body) = (404, 'text/plain', 'NOT FOUND')
 
-        except Exception:
-            print(traceback.format_exc())
-            (response_code, content_type, body) = (500, "text/plain", traceback.format_exc())
+@app.route('/event-stream')
+def event_stream() -> Tuple[str, int, Dict[str, str]]:
+    msg = skeptis.event_queue.pop() if skeptis.event_queue else 'Nothing Is Happening'
+    return ('data: %s\n\n' % msg, 200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+    })
 
-        self.send_response(response_code)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-cache")
-        self.end_headers()
-        self.wfile.write(body.encode())
+
+@app.route('/wallet')
+def get_wallet() -> Dict[str, int]:
+    return {'size': len(skeptis.wallet.keypairs)}
+
+
+@app.route('/height')
+def get_height() -> Dict[str, int]:
+    height = len(skeptis.thread.local_peer.chain_manager.coinstate.block_by_hash)
+    return {'height': height}
+
+
+class HttpHandler:
 
     @staticmethod
-    def serverLoop() -> None:
-        httpd = ThreadingHTTPServer(HttpHandler.server_address, HttpHandler)
-        httpd.serve_forever()
+    def server_loop() -> None:
+        app.run()
+
+    server_address = ('127.0.0.1', 5000)  # this is the flask default
