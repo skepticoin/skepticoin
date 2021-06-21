@@ -1,20 +1,17 @@
 
 import logging
-import os
 import random
 import selectors
+from skepticoin.networking.remote_peer import ConnectedRemotePeer, DisconnectedRemotePeer, IRRELEVANT
+from skepticoin.networking.remote_peer import INCOMING, LISTENING_SOCKET, OUTGOING
+from skepticoin.networking.disk_interface import DiskInterface
 import socket
 import traceback
 import sys
 from datetime import datetime
 
-from typing import List, Optional
+from typing import Optional
 from skepticoin.humans import human
-from skepticoin.utils import block_filename
-from skepticoin.datatypes import Block, Transaction
-from skepticoin.networking.remote_peer import (
-    ConnectedRemotePeer, DisconnectedRemotePeer, LISTENING_SOCKET, OUTGOING, IRRELEVANT, INCOMING
-)
 from skepticoin.networking.params import PORT
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.networking.manager import ChainManager, NetworkManager
@@ -22,33 +19,10 @@ from skepticoin.utils import calc_work
 from time import time
 from typing import Dict
 
-import json
-
 MAX_SELECTOR_SIZE_BY_PLATFORM: Dict[str, int] = {
     "win32": 64,
     "linux": 512,
 }
-
-
-class DiskInterface:
-    """Catch-all for writing to and reading from disk, factored out to facilitate testing."""
-
-    def save_block(self, block: Block) -> None:
-        with open('chain/%s' % block_filename(block), 'wb') as f:
-            f.write(block.serialize())
-
-    def overwrite_peers(self, peers: List[ConnectedRemotePeer]) -> None:
-        db = [(remote_peer.host, remote_peer.port, remote_peer.direction)
-              for remote_peer in peers if remote_peer.direction == OUTGOING and remote_peer.hello_received]
-        if db:
-            with open("peers.json", "w") as f:
-                json.dump(db, f, indent=4)
-        else:
-            os.remove("peers.json")
-
-    def save_transaction_for_debugging(self, transaction: Transaction) -> None:
-        with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
-            f.write(transaction.serialize())
 
 
 class LocalPeer:
@@ -60,7 +34,7 @@ class LocalPeer:
         ] = None  # TODO perhaps just push this into the signature here?
         self.nonce = random.randrange(pow(2, 32))
         self.selector = selectors.DefaultSelector()
-        self.network_manager = NetworkManager(self)
+        self.network_manager = NetworkManager(self, disk_interface=disk_interface)
         self.chain_manager = ChainManager(self, int(time()))
         self.managers = [
             self.network_manager,
@@ -138,10 +112,11 @@ class LocalPeer:
             self.selector.unregister(remote_peer.sock)
             remote_peer.sock.close()
             self.network_manager.handle_peer_disconnected(remote_peer)
+
         except Exception as e:
             # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
-            # (i.e. the whole business of unregistering things that are already in some half-baked state)
-            # at least one path how you might end up here: a EVENT_WRITE is reached for a socket that was just closed
+            # (i.e. the whole business of unregistering things that are already in some half-baked state).
+            # One path how you might end up here: a EVENT_WRITE is reached for a socket that was just closed
             # as a consequence of something that was read.
             self.logger.info("%15s Error while disconnecting %s" % ("", e))
 

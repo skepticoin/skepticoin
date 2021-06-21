@@ -3,14 +3,13 @@ from io import BytesIO
 import traceback
 
 from ipaddress import IPv6Address
-
-from typing import TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from skepticoin.networking.local_peer import LocalPeer
 
 from time import time
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import struct
 import socket
@@ -41,10 +40,8 @@ from .messages import (
     InventoryMessage,
     InventoryItem,
 )
-import json
 from skepticoin.__version__ import __version__
 import random
-
 
 LISTENING_SOCKET = "LISTENING_SOCKET"
 IRRELEVANT = "IRRELEVANT"  # TODO don't use a string for a port number
@@ -62,15 +59,6 @@ def load_peers_from_list(
         (host, port, direction): DisconnectedRemotePeer(host, port, direction, None)
         for (host, port, direction) in lst
     }
-
-
-def load_peers() -> Dict[Tuple[str, int, str], DisconnectedRemotePeer]:
-    try:
-        db = [tuple(li) for li in json.loads(open("peers.json").read())]
-    except Exception:
-        db = []
-
-    return load_peers_from_list(db)  # type: ignore
 
 
 def _new_context() -> int:
@@ -330,7 +318,7 @@ class ConnectedRemotePeer(RemotePeer):
             self.local_peer.network_manager.my_addresses.add((self.host, self.port))
             self.local_peer.disconnect(self, "connection to self")
 
-        self.local_peer.disk_interface.overwrite_peers(list(self.local_peer.network_manager.connected_peers.values()))
+        self.local_peer.disk_interface.write_peers(self.local_peer.network_manager.connected_peers)
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
