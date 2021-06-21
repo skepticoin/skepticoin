@@ -1,6 +1,5 @@
 
 import logging
-import os
 import random
 import selectors
 import socket
@@ -8,7 +7,7 @@ import traceback
 import sys
 from datetime import datetime
 
-from typing import List, Optional
+from typing import Optional
 from skepticoin.humans import human
 from skepticoin.utils import block_filename
 from skepticoin.datatypes import Block, Transaction
@@ -22,8 +21,6 @@ from skepticoin.utils import calc_work
 from time import time
 from typing import Dict
 
-import json
-
 MAX_SELECTOR_SIZE_BY_PLATFORM: Dict[str, int] = {
     "win32": 64,
     "linux": 512,
@@ -36,15 +33,6 @@ class DiskInterface:
     def save_block(self, block: Block) -> None:
         with open('chain/%s' % block_filename(block), 'wb') as f:
             f.write(block.serialize())
-
-    def overwrite_peers(self, peers: List[ConnectedRemotePeer]) -> None:
-        db = [(remote_peer.host, remote_peer.port, remote_peer.direction)
-              for remote_peer in peers if remote_peer.direction == OUTGOING and remote_peer.hello_received]
-        if db:
-            with open("peers.json", "w") as f:
-                json.dump(db, f, indent=4)
-        else:
-            os.remove("peers.json")
 
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:

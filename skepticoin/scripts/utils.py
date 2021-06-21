@@ -1,11 +1,10 @@
-import json
 from io import BytesIO
 import zipfile
 import sys
 import urllib.request
 from pathlib import Path
 from time import sleep, time
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, Optional
 import os
 import tempfile
 import logging
@@ -16,13 +15,7 @@ from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
-from skepticoin.networking.remote_peer import load_peers
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
-
-PEER_URLS: List[str] = [
-    "https://pastebin.com/raw/CcfPX9mS",
-    "https://skepticoin.s3.amazonaws.com/peers.json",
-]
 
 
 class DefaultArgumentParser(argparse.ArgumentParser):
@@ -32,31 +25,6 @@ class DefaultArgumentParser(argparse.ArgumentParser):
         self.add_argument("--listening-port", help="Port to listen on", type=int, default=2412)
         self.add_argument("--log-to-file", help="Log to file", action="store_true")
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
-
-
-def initialize_peers_file() -> None:
-    if os.path.isfile("peers.json"):
-        return
-
-    all_peers: Set[Tuple[str, int, str]] = set()
-
-    for url in PEER_URLS:
-        print(f"downloading {url}")
-
-        with urllib.request.urlopen(url, timeout=1) as resp:
-            try:
-                peers = json.loads(resp.read())
-            except ValueError:
-                continue
-
-            for peer in peers:
-                if len(peer) != 3:
-                    continue
-
-                all_peers.add(tuple(peer))  # type: ignore
-
-    print("Creating new peers.json")
-    json.dump(list(list(peer) for peer in peers), open("peers.json", "w"))
 
 
 def create_chain_dir() -> None:
@@ -166,7 +134,6 @@ def start_networking_peer_in_background(
     print("Starting networking peer in background")
     port: Optional[int] = None if args.dont_listen else args.listening_port
     thread = NetworkingThread(coinstate, port)
-    thread.local_peer.network_manager.disconnected_peers = load_peers()
     thread.start()
     return thread
 

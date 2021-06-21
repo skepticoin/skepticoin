@@ -10,7 +10,6 @@ import skepticoin.humans
 from skepticoin.params import SASHIMI_PER_COIN
 from skepticoin.scripts.utils import (
     configure_logging_from_args,
-    initialize_peers_file,
     create_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
@@ -36,7 +35,6 @@ def main() -> None:
     create_chain_dir()
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
-    initialize_peers_file()
     thread = start_networking_peer_in_background(args, coinstate)
     thread.local_peer.show_stats()
 

@@ -4,6 +4,7 @@ from typing import Optional
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.params import PORT
 from skepticoin.networking.local_peer import DiskInterface, LocalPeer
+from skepticoin.networking.remote_peer import load_peers
 
 
 class NetworkingThread(Thread):
@@ -18,6 +19,7 @@ class NetworkingThread(Thread):
 
         self.local_peer = LocalPeer(disk_interface=disk_interface)
         self.local_peer.chain_manager.set_coinstate(coinstate)
+        self.local_peer.network_manager.disconnected_peers = load_peers()
 
     def run(self) -> None:
         if self.port is not None:
