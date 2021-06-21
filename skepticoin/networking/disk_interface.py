@@ -1,6 +1,5 @@
 import os
-import pickle
-from skepticoin.coinstate import CoinState
+from skepticoin.networking.params import MAX_CONNECTION_ATTEMPTS
 from typing import Dict, List, Set, Tuple
 from skepticoin.datatypes import Transaction
 from skepticoin.networking.remote_peer import (
@@ -8,7 +7,9 @@ from skepticoin.networking.remote_peer import (
 )
 import json
 import urllib.request
+import pickle
 from skepticoin.humans import human
+from skepticoin.coinstate import CoinState
 
 
 PEER_URLS: List[str] = [
@@ -59,7 +60,7 @@ class DiskInterface:
     def write_peers(self, peers: Dict[Tuple[str, int, str], ConnectedRemotePeer]) -> None:
         db = [(remote_peer.host, remote_peer.port, remote_peer.direction)
               for remote_peer in peers.values()
-              if (remote_peer.direction == OUTGOING and remote_peer.hello_received)]
+              if (remote_peer.direction == OUTGOING and remote_peer.ban_score < MAX_CONNECTION_ATTEMPTS)]
 
         db.sort()
 
