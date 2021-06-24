@@ -215,7 +215,7 @@ Resources:
               content: !Sub
                 - |
                   */15 * * * * nc -zv 127.0.0.1 2412 || aws autoscaling set-instance-health --region ${AWS::Region} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --health-status Unhealthy
-                  0 * * * * cd /tmp/skepticoin && aws s3 sync . s3://${PUBLIC_BUCKET}/ --exclude "*" --include peers.json
+                  0 * * * * cd /tmp/skepticoin && aws s3 cp peers.json s3://${PUBLIC_BUCKET}/
                 - PUBLIC_BUCKET: !ImportValue "PublicBucket"
           commands:
             01_install:
