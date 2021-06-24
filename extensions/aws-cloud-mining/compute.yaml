@@ -42,6 +42,14 @@ Parameters:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of an existing EC2 key pair to enable SSH access to the ECS
       instances
+  SkepticoinMiningParams:
+    Type: String
+    Description: Command-line parameters for skepticoin-mine
+    Default: --quiet
+  MetricsCollectionInterval:
+    Type: Number
+    Description: See https://forums.aws.amazon.com/thread.jspa?messageID=949532
+    Default: 86400
 
 Resources:
   EC2InstanceRole:
@@ -107,7 +115,7 @@ Resources:
               content: !Sub |
                 {
                     "agent": {
-                      "metrics_collection_interval": 60,
+                      "metrics_collection_interval": ${MetricsCollectionInterval},
                       "logfile": "/var/log/amazon-cloudwatch-agent.log"
                     },
                     "logs": {
@@ -187,7 +195,7 @@ Resources:
                 aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.cache
 
                 # start mining
-                PYTHONUNBUFFERED=1 nohup skepticoin-mine --quiet >> $LOG 2>&1 &
+                PYTHONUNBUFFERED=1 nohup skepticoin-mine ${SkepticoinMiningParams} >> $LOG 2>&1 &
                 echo "miner starting"
               owner: ec2-user
               group: ec2-user
