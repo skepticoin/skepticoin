@@ -102,8 +102,7 @@ class LocalPeer:
         # self.logger.info("LocalPeer.handle_remote_peer_selector_event()")
 
         sock: socket.socket = key.fileobj  # type: ignore
-        remote_peer = key.data
-        assert isinstance(remote_peer, ConnectedRemotePeer)
+        remote_peer: ConnectedRemotePeer = key.data
 
         try:
             if mask & selectors.EVENT_READ:
@@ -206,7 +205,6 @@ class LocalPeer:
 
     def show_stats(self) -> None:
         coinstate = self.chain_manager.coinstate
-        assert coinstate
 
         out = "NETWORK - %d connected peers: \n" % len(self.network_manager.get_active_peers())
         for p in self.network_manager.get_active_peers():
@@ -253,17 +251,14 @@ class LocalPeer:
 
     def show_chain_stats(self) -> None:
         coinstate = self.chain_manager.coinstate
-        assert coinstate
 
         def get_block_timespan_factor(n: int) -> float:
             # Current block duration over past n block as a factor of DESIRED_BLOCK_TIMESPAN, e.g. 0.5 for twice desired
             # speed
-            assert coinstate
             diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
             return diff / (DESIRED_BLOCK_TIMESPAN * n)  # type: ignore
 
         def get_network_hash_rate(n: int) -> float:
-            assert coinstate
             total_over_blocks = sum(
                 calc_work(coinstate.at_head.block_by_height[coinstate.head().height - i].target) for i in range(n))
 

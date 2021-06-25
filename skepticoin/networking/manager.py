@@ -184,8 +184,6 @@ class ChainManager(Manager):
 
     def should_actively_fetch_blocks(self, current_time: int) -> bool:
 
-        assert self.coinstate
-
         return (
             (current_time > self.coinstate.head().timestamp + SWITCH_TO_ACTIVE_MODE_TIMEOUT)
             or (current_time <= self.started_at + 60)  # always sync w/ network right after restart
@@ -206,7 +204,6 @@ class ChainManager(Manager):
             try:
                 validate_non_coinbase_transaction_by_itself(transaction)
 
-                assert self.coinstate
                 assert self.coinstate.current_chain_hash
 
                 validate_non_coinbase_transaction_in_coinstate(
@@ -232,7 +229,6 @@ class ChainManager(Manager):
 
     def get_state(self) -> Tuple[CoinState, List[Transaction]]:
         with self.lock:
-            assert self.coinstate
             return self.coinstate, self.transaction_pool
 
     def _cleanup_transaction_pool_for_coinstate(self, coinstate: CoinState) -> None:
@@ -240,7 +236,6 @@ class ChainManager(Manager):
         # the pool
         def is_valid(transaction: Transaction) -> bool:
             try:
-                assert self.coinstate
                 assert self.coinstate.current_chain_hash
 
                 # validate_non_coinbase_transaction_by_itself(transaction) Not needed, this never changes
@@ -256,7 +251,6 @@ class ChainManager(Manager):
         self.transaction_pool = [t for t in self.transaction_pool if is_valid(t)]
 
     def get_get_blocks_message(self) -> GetBlocksMessage:
-        assert self.coinstate
 
         heights = get_recent_block_heights(self.coinstate.head().height)
         potential_start_hashes = [self.coinstate.by_height_at_head()[height].hash() for height in heights]
