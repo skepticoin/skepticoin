@@ -173,6 +173,7 @@ def start_networking_peer_in_background(
 
 def configure_logging_for_file() -> None:
     log_filename = Path(tempfile.gettempdir()) / ("skepticoin-networking-%s.log" % int(time()))
+    print('Logging to file: %s' % log_filename)
     FORMAT = '%(asctime)s %(message)s'
     logging.basicConfig(format=FORMAT, stream=open(log_filename, "w"), level=logging.INFO)
 

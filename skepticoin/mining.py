@@ -173,8 +173,12 @@ class MinerWatcher:
         hashes = self.hash_stats[timestamp]
 
         mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
+
+        n_peers = len(self.network_thread.local_peer.network_manager.get_active_peers())
+
         print(f"{now_str} | uptime: {uptime_str} | {hashes:>3} hash/sec" +
-              f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h")
+              f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h" +
+              f" | {n_peers:3d} peers")
 
     def send_message(self, miner_id: int, message_type: str, data: Any) -> None:
         self.send_queues[miner_id].put((message_type, data))

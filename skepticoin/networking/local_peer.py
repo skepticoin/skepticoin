@@ -146,7 +146,6 @@ class LocalPeer:
             self.logger.info("%15s Error while disconnecting %s" % ("", e))
 
     def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
-        self.logger.info("%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host)
 
         max_selector_map_size = MAX_SELECTOR_SIZE_BY_PLATFORM.get(sys.platform, 64)
 
@@ -154,6 +153,8 @@ class LocalPeer:
             # We hit the platform-dependent limit of connected peers
             # TODO this is actually a hack, find a proper solution
             return
+
+        self.logger.info("%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host)
 
         server_addr = (disconnected_peer.host, disconnected_peer.port)
 

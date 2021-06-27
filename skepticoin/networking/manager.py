@@ -97,7 +97,7 @@ class NetworkManager(Manager):
             if remote_peer.hello_received:
                 self.disconnected_peers[key] = remote_peer.as_disconnected()
             else:
-                print('Bad Peer (disconnected without hello): ' + remote_peer.host)
+                self.local_peer.logger.info('%15s Disconnected without hello - Bad Peer' % remote_peer.host)
                 self.local_peer.disk_interface.overwrite_peers(list(self.connected_peers.values()))
 
         self._sanity_check()
