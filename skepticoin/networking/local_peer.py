@@ -46,7 +46,7 @@ class LocalPeer:
 
     def start_listening(self, port: int = PORT) -> None:
         self.port = port
-        self.logger.info("%15s LocalPeer.start_listening(%s)" % ("", port))
+        self.logger.info("%15s LocalPeer.start_listening(%s, nonce=%d)" % ("", port, self.nonce))
         lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # https://stackoverflow.com/questions/4465959/python-errno-98-address-already-in-use/4466035#4466035
@@ -113,12 +113,12 @@ class LocalPeer:
             remote_peer.sock.close()
             self.network_manager.handle_peer_disconnected(remote_peer)
 
-        except Exception as e:
+        except Exception:
             # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
             # (i.e. the whole business of unregistering things that are already in some half-baked state).
             # One path how you might end up here: a EVENT_WRITE is reached for a socket that was just closed
             # as a consequence of something that was read.
-            self.logger.info("%15s Error while disconnecting %s" % ("", e))
+            self.logger.info("%15s Error while disconnecting %s" % ("", traceback.format_exc()))
 
     def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
 

@@ -230,6 +230,7 @@ class InventoryItem(Serializable):
     def __init__(self, data_type: bytes, hash: bytes):
         self.data_type = data_type
         self.hash = hash
+        self.block_requested = False
 
     @classmethod
     def stream_deserialize(cls, f: BinaryIO) -> InventoryItem:

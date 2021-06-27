@@ -1,15 +1,16 @@
 from __future__ import annotations
 from io import BytesIO
+from threading import Thread
 import traceback
 
 from ipaddress import IPv6Address
-from typing import Dict, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from skepticoin.networking.local_peer import LocalPeer
 
 from time import time
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import struct
 import socket
@@ -19,6 +20,7 @@ from skepticoin.humans import human
 from .params import (
     GET_BLOCKS_INVENTORY_SIZE,
     GET_PEERS_INTERVAL,
+    IBD_VALIDATION_SKIP,
     TIME_BETWEEN_CONNECTION_ATTEMPTS,
 )
 from skepticoin.datatypes import Block, Transaction
@@ -42,6 +44,7 @@ from .messages import (
 )
 from skepticoin.__version__ import __version__
 import random
+from skepticoin.consensus import validate_block_by_itself, validate_block_in_coinstate
 
 LISTENING_SOCKET = "LISTENING_SOCKET"
 IRRELEVANT = "IRRELEVANT"  # TODO don't use a string for a port number
@@ -177,6 +180,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.waiting_for_inventory: bool = False
         self.last_empty_inventory_response_at: int = 0
         self.inventory_messages: List[InventoryMessageState] = []
+        self.blocks_waiting_for_validation: List[Block] = []
 
         self._next_msg_id: int = 0
         self.last_get_peers_sent_at: Optional[int] = None
@@ -233,10 +237,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.send_backlog.append((MAGIC + struct.pack(b">I", len(data)) + data))
 
-        self.check_message_backlog()
-
-    def check_message_backlog(self) -> None:
-        if len(self.send_buffer) == 0 and len(self.send_backlog) > 0:
+        if len(self.send_buffer) == 0:
             self.send_buffer = self.send_backlog.pop(0)
             self.start_sending()
 
@@ -281,18 +282,21 @@ class ConnectedRemotePeer(RemotePeer):
         raise NotImplementedError("%s" % message)
 
     def handle_can_send(self, sock: socket.socket) -> None:
-        self.local_peer.logger.info("ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)"
-                                    % (len(self.send_buffer), len(self.send_backlog)))
+        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)"
+                                    % (self.host, len(self.send_buffer), len(self.send_backlog)))
 
         sent = sock.send(self.send_buffer)
         self.send_buffer = self.send_buffer[sent:]
 
         if len(self.send_buffer) == 0:
-            self.stop_sending()  # in principle: wasteful, but easy to reason about.
-            self.check_message_backlog()
+            if len(self.send_backlog) == 0:
+                self.stop_sending()
+            else:
+                self.send_buffer = self.send_backlog.pop(0)
+                self.handle_can_send(sock)
 
     def handle_receive_data(self, data: bytes) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data()" % self.host)
+        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data(%d)" % (self.host, len(data)))
         self.receiver.receive(data)
 
     def handle_hello_message_received(
@@ -322,6 +326,7 @@ class ConnectedRemotePeer(RemotePeer):
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
+
         coinstate = self.local_peer.chain_manager.coinstate
         self.local_peer.logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
         for potential_start_hash in message.potential_start_hashes:
@@ -360,60 +365,39 @@ class ConnectedRemotePeer(RemotePeer):
         if len(message.items) > GET_BLOCKS_INVENTORY_SIZE:
             raise Exception("Inventory msg too big")
 
-        self.waiting_for_inventory = False
-
         if message.items == []:
             self.local_peer.logger.info("%15s ConnectedRemotePeer.last_empty_inventory_response_at set" % self.host)
             self.last_empty_inventory_response_at = int(time())  # TODO time() as a pass-along?
+            self.waiting_for_inventory = False
             return
 
         self.inventory_messages.append(InventoryMessageState(header, message))
         self.check_inventory_messages()
 
-    def _get_hash_from_inventory_messages(
-        self,
-    ) -> Optional[Tuple[InventoryMessageState, bytes]]:
-        while self.inventory_messages:
-            msg_state = self.inventory_messages[0]
-
-            if msg_state.index <= len(msg_state.message.items) - 1:
-                if msg_state.message.items[msg_state.index].data_type != DATA_BLOCK:
-                    raise Exception("We only deal w/ Block InventoryMessage for now")
-
-                result: bytes = msg_state.message.items[msg_state.index].hash
-                msg_state.index += 1
-                return msg_state, result
-
-            if not msg_state.actually_used and len(msg_state.message.items) > 0:
-                self.local_peer.logger.info(
-                    "%15s ConnectedRemotePeer._get_hash_from_inventory_messages: try again from %s" % (
-                        self.host, human(msg_state.message.items[-1].hash)))
-
-                get_blocks_message = GetBlocksMessage([msg_state.message.items[-1].hash])
-                self.waiting_for_inventory = True
-                # TODO consider adding something like the below
-                # self.actively_fetching_blocks_from_peers.append((current_time + IBD_PEER_TIMEOUT, remote_peer))
-                self.send_message(get_blocks_message, prev_header=msg_state.header)
-
-            self.inventory_messages.pop(0)
-
-        return None
+        # speed optimization: go ahead and ask for more inventory now, there is no reason to wait
+        get_blocks_message = GetBlocksMessage([message.items[-1].hash])
+        self.send_message(get_blocks_message, prev_header=header)
 
     def check_inventory_messages(self) -> None:
         coinstate = self.local_peer.chain_manager.coinstate
 
-        while True:
-            tup = self._get_hash_from_inventory_messages()
-
-            if not tup:
-                return
-
-            msg_state, next_hash = tup
-
-            if next_hash not in coinstate.block_by_hash:
+        for msg_state in self.inventory_messages:
+            if not msg_state.actually_used:
                 msg_state.actually_used = True
-                self.send_message(GetDataMessage(DATA_BLOCK, next_hash), prev_header=msg_state.header)
-                return
+                for item in msg_state.message.items:
+                    if not item.block_requested and item.hash not in coinstate.block_by_hash:
+                        item.block_requested = True
+                        self.send_message(GetDataMessage(DATA_BLOCK, item.hash), prev_header=msg_state.header)
+
+    def remove_from_inventory(self, hash: bytes) -> None:
+        for i, msg_state in enumerate(self.inventory_messages):
+            for j, item in enumerate(msg_state.message.items):
+                if item.hash == hash:
+                    del msg_state.message.items[j]
+                    break
+            if len(msg_state.message.items) == 0:
+                del self.inventory_messages[i]
+                break
 
     def handle_get_data_message_received(
         self, header: MessageHeader, get_data_message: GetDataMessage
@@ -451,43 +435,61 @@ class ConnectedRemotePeer(RemotePeer):
     def handle_block_received(
         self, header: MessageHeader, message: DataMessage
     ) -> None:
-        # TODO deal with out-of-order blocks more gracefully
 
         block: Block = message.data  # type: ignore
 
-        coinstate = self.local_peer.chain_manager.coinstate
+        coinstate_prior = self.local_peer.chain_manager.coinstate
 
-        if block.hash() in coinstate.block_by_hash:
-            # implicit here: when you receive a datamessage, this could be because you requested it; and thus you'll
-            # want to request the next one (the below check does nothing if there's nothing to do)
-            self.check_inventory_messages()
+        block_hash = block.hash()
+        self.remove_from_inventory(block_hash)
 
-            self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_block_received() for known block %s" % (
-                self.host, human(block.hash())))
+        if block_hash not in coinstate_prior.block_by_hash:
 
-            # Known block, just return
-            return
+            if block.header.summary.previous_block_hash not in coinstate_prior.block_by_hash:
+                # This is not common, so it doesn't need special handling.
+                self.local_peer.logger.info("%15s at height=%d, block received out of order for height=%d: %s"
+                                            % (self.host, coinstate_prior.head().height, block.height,
+                                               human(block_hash)))
+                return
 
-        try:
-            coinstate = coinstate.add_block(block, int(time()))  # TODO time() as a pass-along?
-            self.local_peer.chain_manager.set_coinstate(coinstate)
-            self.local_peer.disk_interface.save_block(block)
+            validate_block_by_itself(block, int(time()))
+            coinstate_changed = coinstate_prior.add_block_no_validation(block)
+            self.blocks_waiting_for_validation.append(block)
 
-        except Exception as e:
-            # TODO: dirty hack at this particular point... to allow for out-of-order blocks to not take down the whole
-            # peer, but this should more specifically match for a short list of OK problems.
-            self.local_peer.logger.info("%15s INVALID block %s" % (self.host, str(e)))
+            if header.in_response_to == 0 or block.height % IBD_VALIDATION_SKIP == 0:
+                # Validation is very slow, and we don't have to validate every block in a blockchain, so
+                # during IBD, we only validate every Nth block where N := IBD_VALIDATION_SKIP.
+                # Because the BLOCKS are part of a CHAIN of hashes, every valid block[n] guarantees a valid
+                # block[n-1]. Just to keep things clean, we avoid writing unvalidated blocks to disk until
+                # their next "validated descendent" is encountered (this is unnecessary, but neat).
+                # During normal operation (non-IBD) we just validate every block because we're not in a hurry.
+                try:
+                    validate_block_in_coinstate(block, coinstate_prior)  # very slow
+                    self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
 
-        # implicit here: when you receive a datamessage, this is because you requested it; and thus you'll want to
-        # request the next one
-        self.check_inventory_messages()
+                    valid_blocks = self.blocks_waiting_for_validation.copy()
+                    self.blocks_waiting_for_validation.clear()
 
-        if block == coinstate.head() and header.in_response_to == 0:
-            # "header.in_response_to == 0" is being used as a bit of a proxy for "not in IBD" here, but it would be
-            # better to check for that state more explicitly. We don't want to broadcast blocks while in IBD, because in
-            # that state the fact that some block is our new head doesn't mean at all that we're talking about the real
-            # chain's new head, and only the latter is relevant to the rest of the world.
-            self.local_peer.network_manager.broadcast_block(block)
+                    def write_pending_blocks() -> None:  # very slow, but ok to run in a separate thread!
+                        for valid_block in valid_blocks:
+                            self.local_peer.disk_interface.save_block(valid_block)
+                    Thread(target=write_pending_blocks, args=[]).start()
+
+                except Exception:
+                    self.local_peer.logger.info("%15s INVALID block: %s" % (self.host, traceback.format_exc()))
+                    if self.local_peer.chain_manager.last_known_valid_coinstate:
+                        self.local_peer.chain_manager.set_coinstate(
+                            self.local_peer.chain_manager.last_known_valid_coinstate)
+                    return
+            else:
+                self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=False)
+
+            if block == coinstate_changed.head() and header.in_response_to == 0:
+                # "header.in_response_to == 0" is being used as a bit of a proxy for "not in IBD" here, but it would be
+                # better to check for that state more explicitly. We don't want to broadcast blocks while in IBD,
+                # because in that state the fact that some block is our new head doesn't mean at all that we're talking
+                # about the real chain's new head, and only the latter is relevant to the rest of the world.
+                self.local_peer.network_manager.broadcast_block(block)
 
     def handle_transaction_received(
         self, header: MessageHeader, message: DataMessage
