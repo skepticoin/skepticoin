@@ -9,8 +9,6 @@ MAX_IBD_PEERS = 1
 IBD_PEER_TIMEOUT = 60
 IBD_VALIDATION_SKIP = 1000
 
-TRUSTED_BLOCKCHAIN_ZIP = "https://github.com/skepticoin/blockchain/archive/refs/heads/master.zip"
-
 GET_BLOCKS_INVENTORY_SIZE = 500
 
 SWITCH_TO_ACTIVE_MODE_TIMEOUT = 5 * 60  # if your chain is 5 minutes old, start querying for blocks actively
