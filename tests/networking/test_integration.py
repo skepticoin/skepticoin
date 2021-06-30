@@ -3,6 +3,7 @@ The general theme of these tests is: let's do some end-to-end tests, so we at le
 the most obvious of mistakes.
 """
 
+from typing import Dict, Tuple
 import pytest
 from time import time
 import logging
@@ -15,7 +16,7 @@ from skepticoin.datatypes import Block, Transaction, Input, Output, OutputRefere
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.messages import InventoryMessage
 from skepticoin.networking.threading import NetworkingThread
-from skepticoin.networking.remote_peer import load_peers_from_list
+from skepticoin.networking.remote_peer import DisconnectedRemotePeer, load_peers_from_list
 
 CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("../testdata/chain")
 
@@ -24,8 +25,11 @@ class FakeDiskInterface:
     def save_block(self, block):
         pass
 
-    def overwrite_peers(self, remote_peers):
+    def write_peers(self, remote_peers):
         pass
+
+    def load_peers(self) -> Dict[Tuple[str, int, str], DisconnectedRemotePeer]:
+        return {}
 
     def save_transaction_for_debugging(self, transaction):
         pass
@@ -71,7 +75,7 @@ def test_ibd_integration(caplog):
     try:
         start_time = time()
         while True:
-            if thread_b.local_peer.chain_manager.coinstate.head().height == 5:
+            if thread_b.local_peer.chain_manager.coinstate.head().height >= 5:
                 break
 
             if time() > start_time + 5:

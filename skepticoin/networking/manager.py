@@ -1,4 +1,5 @@
 from __future__ import annotations
+from skepticoin.networking.local_peer import DiskInterface
 
 import traceback
 from threading import Lock
@@ -43,11 +44,12 @@ class Manager:
 
 class NetworkManager(Manager):
 
-    def __init__(self, local_peer: LocalPeer):
+    def __init__(self, local_peer: LocalPeer, disk_interface: DiskInterface = DiskInterface()) -> None:
         self.local_peer = local_peer
         self.my_addresses: Set[Tuple[str, int]] = set()
         self.connected_peers: Dict[Tuple[str, int, str], ConnectedRemotePeer] = {}
         self.disconnected_peers: Dict[Tuple[str, int, str], DisconnectedRemotePeer] = {}
+        self.disk_interface = disk_interface
 
     def _sanity_check(self) -> None:
         for key in self.disconnected_peers:
@@ -98,7 +100,7 @@ class NetworkManager(Manager):
                 self.disconnected_peers[key] = remote_peer.as_disconnected()
             else:
                 self.local_peer.logger.info('%15s Disconnected without hello - Bad Peer' % remote_peer.host)
-                self.local_peer.disk_interface.overwrite_peers(list(self.connected_peers.values()))
+                self.disk_interface.write_peers(self.connected_peers)
 
         self._sanity_check()
 
