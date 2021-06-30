@@ -465,15 +465,6 @@ class ConnectedRemotePeer(RemotePeer):
                 # During normal operation (non-IBD) we just validate every block because we're not in a hurry.
                 try:
                     validate_block_in_coinstate(block, coinstate_prior)  # very slow
-                    self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
-
-                    valid_blocks = self.blocks_waiting_for_validation.copy()
-                    self.blocks_waiting_for_validation.clear()
-
-                    def write_pending_blocks() -> None:  # very slow, but ok to run in a separate thread!
-                        for valid_block in valid_blocks:
-                            self.local_peer.disk_interface.save_block(valid_block)
-                    Thread(target=write_pending_blocks, args=[]).start()
 
                 except Exception:
                     self.local_peer.logger.info("%15s INVALID block: %s" % (self.host, traceback.format_exc()))
@@ -481,6 +472,24 @@ class ConnectedRemotePeer(RemotePeer):
                         self.local_peer.chain_manager.set_coinstate(
                             self.local_peer.chain_manager.last_known_valid_coinstate)
                     return
+
+                self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
+
+                valid_blocks = self.blocks_waiting_for_validation.copy()
+                self.blocks_waiting_for_validation.clear()
+
+                if len(valid_blocks) == 1:
+                    self.local_peer.disk_interface.save_block(valid_blocks[0])
+                else:
+                    def write_pending_blocks() -> None:  # very slow, but ok to run in a separate thread!
+                        print("Deferred-writing blocks %d to %d... please don't interrupt"
+                              % (valid_blocks[0].header.summary.height, valid_blocks[-1].header.summary.height))
+                        for valid_block in valid_blocks:
+                            self.local_peer.disk_interface.save_block(valid_block)
+                        print("Deferred-writing blocks %d to %d... COMPLETED!"
+                              % (valid_blocks[0].header.summary.height, valid_blocks[-1].header.summary.height))
+                    Thread(target=write_pending_blocks, args=[]).start()
+
             else:
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=False)
 
