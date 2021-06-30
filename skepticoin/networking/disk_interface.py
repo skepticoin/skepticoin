@@ -1,7 +1,8 @@
 import os
+import pickle
+from skepticoin.coinstate import CoinState
 from typing import Dict, List, Set, Tuple
-from skepticoin.utils import block_filename
-from skepticoin.datatypes import Block, Transaction
+from skepticoin.datatypes import Transaction
 from skepticoin.networking.remote_peer import (
     ConnectedRemotePeer, DisconnectedRemotePeer, OUTGOING, load_peers_from_list
 )
@@ -72,9 +73,12 @@ class DiskInterface:
 
             self.last_saved_peers = db
 
-    def save_block(self, block: Block) -> None:
-        with open('chain/%s' % block_filename(block), 'wb') as f:
-            f.write(block.serialize())
+    def write_chain_cache_to_disk(self, coinstate: CoinState) -> None:
+        # Currently this takes about 2 seconds. It could be optimized further
+        # if we switch to an appendable file format for the cache.
+        with open('chain.cache.tmp', 'wb') as file:
+            coinstate.dump(lambda data: pickle.dump(data, file))
+        os.replace('chain.cache.tmp', 'chain.cache')
 
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:
