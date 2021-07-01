@@ -62,6 +62,7 @@ def test_ibd_integration(caplog):
     caplog.set_level(logging.INFO)
 
     coinstate = _read_chain_from_disk(5)
+    assert coinstate.head().height == 5
 
     thread_a = NetworkingThread(coinstate, 12412, FakeDiskInterface())
     thread_a.start()

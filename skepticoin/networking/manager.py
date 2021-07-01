@@ -1,9 +1,8 @@
 from __future__ import annotations
 from skepticoin.networking.local_peer import DiskInterface
-
 import traceback
 from threading import Lock
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from skepticoin.coinstate import CoinState
 import random
@@ -52,12 +51,13 @@ class NetworkManager(Manager):
         self.disk_interface = disk_interface
 
     def _sanity_check(self) -> None:
-        for key in self.disconnected_peers:
-            if key in self.connected_peers:
+        for key in self.connected_peers:
+            if key in self.disconnected_peers:
                 raise Exception("this shouldn't happen %s" % (key,))
 
     def step(self, current_time: int) -> None:
         # self.local_peer.logger.info("NetworkManager.step()")
+
         self._sanity_check()
 
         for disconnected_peer in list(self.disconnected_peers.values()):
@@ -66,7 +66,6 @@ class NetworkManager(Manager):
                     disconnected_peer.is_time_to_connect(current_time)):
 
                 disconnected_peer.last_connection_attempt = current_time
-
                 self.local_peer.start_outgoing_connection(disconnected_peer)
 
         for peer in list(self.connected_peers.values()):
@@ -149,6 +148,7 @@ class ChainManager(Manager):
         ] = []
         self.started_at = current_time
         self.transaction_pool: List[Transaction] = []
+        self.last_known_valid_coinstate: Optional[CoinState] = None
 
     def step(self, current_time: int) -> None:
         if not self.should_actively_fetch_blocks(current_time):
@@ -192,11 +192,13 @@ class ChainManager(Manager):
             or (current_time % 60 == 0)  # on average, every 1 minutes, do a network resync explicitly
         )
 
-    def set_coinstate(self, coinstate: CoinState) -> None:
+    def set_coinstate(self, coinstate: CoinState, validated: bool = True) -> None:
         with self.lock:
             self.local_peer.logger.info("%15s ChainManager.set_coinstate(%s)" % ("", coinstate))
             self.coinstate = coinstate
             self._cleanup_transaction_pool_for_coinstate(coinstate)
+            if validated:
+                self.last_known_valid_coinstate = coinstate
 
     def add_transaction_to_pool(self, transaction: Transaction) -> bool:
         with self.lock:
