@@ -31,7 +31,7 @@ class DefaultArgumentParser(argparse.ArgumentParser):
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
 
 
-def create_chain_dir() -> None:
+def check_chain_dir() -> None:
     if os.path.exists('chain'):
         print('Your ./chain/ directory is no longer needed: please delete it to stop this reminder.')
 

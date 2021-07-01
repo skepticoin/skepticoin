@@ -1,7 +1,7 @@
 import traceback
 
 from .utils import (
-    create_chain_dir,
+    check_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
@@ -21,7 +21,7 @@ def main() -> None:
     args = parser.parse_args()
     configure_logging_from_args(args)
 
-    create_chain_dir()
+    check_chain_dir()
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
     thread = start_networking_peer_in_background(args, coinstate)

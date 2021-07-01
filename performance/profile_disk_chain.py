@@ -16,7 +16,7 @@ import pickle
 #   - later increased to 17 seconds after removing some of the hash() caching
 
 from skepticoin.scripts.utils import (
-    create_chain_dir,
+    check_chain_dir,
     read_chain_from_disk
 )
 from skepticoin.coinstate import CoinState
@@ -24,7 +24,7 @@ from skepticoin.coinstate import CoinState
 
 def test_read_chain_from_disk():
 
-    create_chain_dir()
+    check_chain_dir()
 
     with cProfile.Profile() as pr:
         coinstate = pr.runcall(read_chain_from_disk)
