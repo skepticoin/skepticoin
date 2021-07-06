@@ -61,6 +61,7 @@ class NetworkManager(Manager):
         self._sanity_check()
 
         for disconnected_peer in list(self.disconnected_peers.values()):
+
             if (disconnected_peer.direction == OUTGOING and
                 (disconnected_peer.host, disconnected_peer.port) not in self.my_addresses and
                     disconnected_peer.is_time_to_connect(current_time)):
@@ -95,11 +96,13 @@ class NetworkManager(Manager):
         del self.connected_peers[key]
 
         if remote_peer.direction == OUTGOING:
-            if remote_peer.hello_received:
-                self.disconnected_peers[key] = remote_peer.as_disconnected()
-            else:
-                self.local_peer.logger.info('%15s Disconnected without hello - Bad Peer' % remote_peer.host)
+            if not remote_peer.hello_received:
+                remote_peer.ban_score += 1
+                self.local_peer.logger.info('%15s Disconnected without hello, ban_score=%d'
+                                            % (remote_peer.host, remote_peer.ban_score))
                 self.disk_interface.write_peers(self.connected_peers)
+
+            self.disconnected_peers[key] = remote_peer.as_disconnected()
 
         self._sanity_check()
 

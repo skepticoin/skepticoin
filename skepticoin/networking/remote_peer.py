@@ -20,6 +20,7 @@ from .params import (
     GET_BLOCKS_INVENTORY_SIZE,
     GET_PEERS_INTERVAL,
     IBD_VALIDATION_SKIP,
+    MAX_CONNECTION_ATTEMPTS,
     TIME_BETWEEN_CONNECTION_ATTEMPTS,
 )
 from skepticoin.datatypes import Block, Transaction
@@ -58,7 +59,7 @@ def load_peers_from_list(
 ) -> Dict[Tuple[str, int, str], DisconnectedRemotePeer]:
 
     return {
-        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None)
+        (host, port, direction): DisconnectedRemotePeer(host, port, direction, None, ban_score=0)
         for (host, port, direction) in lst
     }
 
@@ -126,12 +127,13 @@ class RemotePeer:
         port: int,
         direction: str,
         last_connection_attempt: Optional[int],
+        ban_score: int
     ):
         self.host = host
         self.port = port
         self.direction = direction
-
         self.last_connection_attempt = last_connection_attempt
+        self.ban_score = ban_score
 
 
 class DisconnectedRemotePeer(RemotePeer):
@@ -141,17 +143,20 @@ class DisconnectedRemotePeer(RemotePeer):
         port: int,
         direction: str,
         last_connection_attempt: Optional[int],
+        ban_score: int
     ):
-        super().__init__(host, port, direction, last_connection_attempt)
-
-        # self.last_seen_alive = None
+        super().__init__(host, port, direction, last_connection_attempt, ban_score)
 
     def is_time_to_connect(self, current_time: int) -> bool:
+        if self.ban_score > MAX_CONNECTION_ATTEMPTS:
+            return False
+        time_between = TIME_BETWEEN_CONNECTION_ATTEMPTS * pow(2, self.ban_score)
         return ((self.last_connection_attempt is None) or
-                (current_time - self.last_connection_attempt >= TIME_BETWEEN_CONNECTION_ATTEMPTS))
+                (current_time - self.last_connection_attempt >= time_between))
 
     def as_connected(self, local_peer: LocalPeer, sock: socket.socket) -> ConnectedRemotePeer:
-        return ConnectedRemotePeer(local_peer, self.host, self.port, self.direction, self.last_connection_attempt, sock)
+        return ConnectedRemotePeer(local_peer, self.host, self.port, self.direction, self.last_connection_attempt, sock,
+                                   self.ban_score)
 
 
 class ConnectedRemotePeer(RemotePeer):
@@ -163,8 +168,9 @@ class ConnectedRemotePeer(RemotePeer):
         direction: str,
         last_connection_attempt: Optional[int],
         sock: socket.socket,
+        ban_score: int,
     ):
-        super().__init__(host, port, direction, last_connection_attempt)
+        super().__init__(host, port, direction, last_connection_attempt, ban_score)
         self.local_peer = local_peer
         self.sock = sock
         self.direction = direction
@@ -185,7 +191,8 @@ class ConnectedRemotePeer(RemotePeer):
         self.waiting_for_peers: bool = False
 
     def as_disconnected(self) -> DisconnectedRemotePeer:
-        return DisconnectedRemotePeer(self.host, self.port, self.direction, self.last_connection_attempt)
+        return DisconnectedRemotePeer(self.host, self.port, self.direction,
+                                      self.last_connection_attempt, self.ban_score)
 
     def step(self, current_time: int) -> None:
         """The responsibility of this method: to send the HelloMessage and GetPeersMessage."""
@@ -303,6 +310,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.logger.info(
             "%15s ConnectedRemotePeer.handle_hello_message_received(%s)" % (self.host, str(message.user_agent)))
         self.hello_received = True
+        self.ban_score = 0
 
         if self.direction == INCOMING:
             # also add the peer to the list of disconnected_peers in reverse direction
@@ -312,8 +320,12 @@ class ConnectedRemotePeer(RemotePeer):
             key = (self.host, message.my_port, OUTGOING)
             nm = self.local_peer.network_manager
             nm._sanity_check()
-            if key not in nm.disconnected_peers and key not in nm.connected_peers:
-                nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING, None)
+            if key in nm.disconnected_peers:
+                # this is likely due to lack of a network return path, e.g. home Internet users without a DMZ
+                self.local_peer.logger.info("%15s incoming with ban_score=%d" % (self.host, self.ban_score))
+            elif key not in nm.connected_peers:
+                nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING,
+                                                                    last_connection_attempt=None, ban_score=0)
             nm._sanity_check()
 
         if self.direction == OUTGOING and message.nonce == self.local_peer.nonce:
@@ -500,11 +512,11 @@ class ConnectedRemotePeer(RemotePeer):
         peers: List[Peer] = []
 
         for con_peer in self.local_peer.network_manager.connected_peers.values():
-            if con_peer.direction == OUTGOING:
+            if con_peer.direction == OUTGOING and con_peer.ban_score < MAX_CONNECTION_ATTEMPTS:
                 peers.append(Peer(int(time()), IPv6Address("::FFFF:%s" % con_peer.host), con_peer.port))
 
         for discon_peer in self.local_peer.network_manager.disconnected_peers.values():
-            if discon_peer.direction == OUTGOING:
+            if discon_peer.direction == OUTGOING and discon_peer.ban_score < MAX_CONNECTION_ATTEMPTS:
                 peers.append(Peer(0, IPv6Address("::FFFF:%s" % discon_peer.host),
                              discon_peer.port))  # TODO 'last seen' time.
 
@@ -516,7 +528,7 @@ class ConnectedRemotePeer(RemotePeer):
     def handle_peers_message_received(
         self, header: MessageHeader, message: PeersMessage
     ) -> None:
-        # TODO peers that have been communicated to you like this should be marked as "not checked yet" somehow, to
+        # Peers that have been communicated to you like this are not allowed to overwrite the ban_score, to help
         # avoid being flooded with nonsense peers.
 
         self.waiting_for_peers = False
@@ -531,6 +543,15 @@ class ConnectedRemotePeer(RemotePeer):
             key = (host, announced_peer.port, OUTGOING)
             nm = self.local_peer.network_manager
             nm._sanity_check()
-            if key not in nm.disconnected_peers and key not in nm.connected_peers:
-                nm.disconnected_peers[key] = DisconnectedRemotePeer(host, announced_peer.port, OUTGOING, None)
+
+            if key in nm.disconnected_peers:
+                if nm.disconnected_peers[key].ban_score > 0:
+                    self.local_peer.logger.info("%15s (ban_score=%d) is broadcasting peer %s (ban_score=%d)" %
+                                                (self.host, self.ban_score, nm.disconnected_peers[key].host,
+                                                 nm.disconnected_peers[key].ban_score))
+
+            elif key not in nm.connected_peers:
+                nm.disconnected_peers[key] = DisconnectedRemotePeer(host, announced_peer.port, OUTGOING, None,
+                                                                    ban_score=0)
+
             nm._sanity_check()
