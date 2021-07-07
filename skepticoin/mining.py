@@ -1,7 +1,7 @@
-from pathlib import Path
 from decimal import Decimal
 from datetime import datetime, timedelta
 import random
+import traceback
 from skepticoin.datatypes import Block, BlockHeader, BlockSummary, Transaction
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
@@ -144,6 +144,9 @@ class MinerWatcher:
         except KeyboardInterrupt:
             pass
 
+        except Exception:
+            print("Error in MinerWatcher message loop: " + traceback.format_exc())
+
         finally:
             print("Restoring unused public key")
             self.wallet.restore_annotated_public_key(self.public_key, "reserved for potentially mined block")
@@ -242,8 +245,10 @@ class MinerWatcher:
         self.network_thread.local_peer.network_manager.broadcast_block(block)
 
         self.coinstate = self.coinstate.add_block(block, int(time()))
-        with open(Path('chain') / block_filename(block), 'wb') as f:
-            f.write(block.serialize())
+
+        # Originally there was a disk write in this spot. During testing of the chain.cache changes,
+        # it was found there is a race condition between the mining thread and the networking thread.
+        # Better to skip the write here and just let the networking thread do it.
 
         print(f"miner {miner_id} found block: {block_filename(block)}")
 
