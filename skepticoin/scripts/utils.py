@@ -36,26 +36,18 @@ def check_chain_dir() -> None:
         print('Your ./chain/ directory is no longer needed: please delete it to stop this reminder.')
 
 
-def check_for_fresh_chain(thread: NetworkingThread) -> bool:
+def check_for_fresh_chain(thread: NetworkingThread) -> None:
+
     # wait until your chain is no more than 20 typical block-sizes old before you start mining yourself
-    waited = False
-    try:
-        while thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN) < time():
-            waited = True
-            thread.local_peer.show_stats()
-            print("Waiting for fresh chain")
-            sleep(10)
+    while thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN) < time():
+        thread.local_peer.show_stats()
+        print("Waiting for fresh chain")
+        sleep(10)
 
-        while len(thread.local_peer.network_manager.get_active_peers()) == 0:
-            waited = True
-            thread.local_peer.show_stats()
-            print("Waiting for peers")
-            sleep(3)
-
-    except KeyboardInterrupt:
-        print("WAITING ABORTED... CONTINUING DESPITE FRESHNESS/CONNECTEDNESS!")
-
-    return waited
+    while len(thread.local_peer.network_manager.get_active_peers()) == 0:
+        thread.local_peer.show_stats()
+        print("Waiting for peers")
+        sleep(3)
 
 
 def read_chain_from_disk() -> CoinState:

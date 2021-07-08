@@ -14,6 +14,7 @@ class NetworkingThread(Thread):
         disk_interface: DiskInterface = DiskInterface(),
     ):
         super().__init__(name="NetworkingThread")
+        self.daemon = True
         self.port = port
 
         self.local_peer = LocalPeer(disk_interface=disk_interface)

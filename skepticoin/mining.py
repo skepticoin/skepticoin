@@ -113,8 +113,8 @@ class MinerWatcher:
 
         self.network_thread.local_peer.show_stats()
 
-        if check_for_fresh_chain(self.network_thread):
-            self.network_thread.local_peer.show_stats()
+        check_for_fresh_chain(self.network_thread)
+        self.network_thread.local_peer.show_stats()
 
         if self.network_thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
             print("Your blockchain is not just old, it is ancient; ABORTING")
