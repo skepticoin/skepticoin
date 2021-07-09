@@ -7,7 +7,7 @@ from .utils import (
     read_chain_from_disk,
     configure_logging_from_args,
     start_networking_peer_in_background,
-    check_for_fresh_chain,
+    wait_for_fresh_chain,
     DefaultArgumentParser,
 )
 
@@ -27,7 +27,7 @@ def main() -> None:
     # blockchain to know the most current balance.
     thread = start_networking_peer_in_background(args, coinstate)
 
-    check_for_fresh_chain(thread)
+    wait_for_fresh_chain(thread)
     coinstate = thread.local_peer.chain_manager.coinstate
     print("Chain up to date")
 
