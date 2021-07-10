@@ -1,9 +1,5 @@
-from io import BytesIO
-from skepticoin.cheating import TRUSTED_BLOCKCHAIN_ZIP
 from skepticoin.networking.disk_interface import DiskInterface
-import zipfile
 import sys
-import urllib.request
 from pathlib import Path
 from time import sleep, time
 from typing import Any, Optional
@@ -12,7 +8,6 @@ import tempfile
 import logging
 import argparse
 import pickle
-import traceback
 
 from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
@@ -52,27 +47,7 @@ def read_chain_from_disk() -> CoinState:
         with open('chain.cache', 'rb') as file:
             coinstate = CoinState.load(lambda: pickle.load(file))
     else:
-        try:
-            print("Pre-download blockchain from trusted source to 'chain.zip'")
-            with urllib.request.urlopen(TRUSTED_BLOCKCHAIN_ZIP) as resp:
-                with open('chain.zip', 'wb') as outfile:
-                    outfile.write(resp.read())
-            print("Reading initial chain from zipfile")
-            coinstate = CoinState.zero()
-            with zipfile.ZipFile('chain.zip') as zip:
-                for entry in zip.infolist():
-                    if not entry.is_dir():
-                        filename = entry.filename.split('/')[1]
-                        height = int(filename.split("-")[0])
-                        if height % 1000 == 0:
-                            print(filename)
-
-                        data = zip.read(entry)
-                        block = Block.stream_deserialize(BytesIO(data))
-                        coinstate = coinstate.add_block_no_validation(block)
-        except Exception:
-            print("Error reading zip file. We'll start with an empty blockchain instead." + traceback.format_exc())
-            coinstate = CoinState.zero()
+        coinstate = CoinState.zero()
 
     rewrite = False
 

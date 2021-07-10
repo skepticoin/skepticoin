@@ -1,5 +1,3 @@
-TRUSTED_BLOCKCHAIN_ZIP = "https://github.com/skepticoin/blockchain/archive/refs/heads/master.zip"
-
 # flake8: noqa (because of E203 whitespace error)
 '''
 Generated like so (in skepticoin-repl):
