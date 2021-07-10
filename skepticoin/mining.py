@@ -24,7 +24,7 @@ from skepticoin.scripts.utils import (
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
-    check_for_fresh_chain,
+    wait_for_fresh_chain,
     configure_logging_from_args,
     DefaultArgumentParser,
 )
@@ -113,8 +113,8 @@ class MinerWatcher:
 
         self.network_thread.local_peer.show_stats()
 
-        if check_for_fresh_chain(self.network_thread):
-            self.network_thread.local_peer.show_stats()
+        wait_for_fresh_chain(self.network_thread)
+        self.network_thread.local_peer.show_stats()
 
         if self.network_thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
             print("Your blockchain is not just old, it is ancient; ABORTING")

@@ -14,7 +14,7 @@ from .utils import (
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
-    check_for_fresh_chain,
+    wait_for_fresh_chain,
     configure_logging_from_args,
     DefaultArgumentParser,
 )
@@ -42,7 +42,7 @@ def main() -> None:
     try:
         # we need a fresh chain because our wallet doesn't track spending/receiving, so we need to look at the real
         # blockchain to know what we can spend.
-        check_for_fresh_chain(thread)
+        wait_for_fresh_chain(thread)
         print("Chain up to date")
 
         target_address = SECP256k1PublicKey(parse_address(args.address))
