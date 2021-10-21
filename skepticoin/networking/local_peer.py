@@ -46,17 +46,21 @@ class LocalPeer:
         self.running = False
 
     def start_listening(self, port: int = PORT) -> None:
-        self.port = port
-        self.logger.info("%15s LocalPeer.start_listening(%s, nonce=%d)" % ("", port, self.nonce))
-        lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.port = port
+            self.logger.info("%15s LocalPeer.start_listening(%s, nonce=%d)" % ("", port, self.nonce))
+            lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        # https://stackoverflow.com/questions/4465959/python-errno-98-address-already-in-use/4466035#4466035
-        lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # https://stackoverflow.com/questions/4465959/python-errno-98-address-already-in-use/4466035#4466035
+            lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        lsock.bind(("", port))
-        lsock.listen()
-        lsock.setblocking(False)
-        self.selector.register(lsock, selectors.EVENT_READ, data=LISTENING_SOCKET)
+            lsock.bind(("", port))
+            lsock.listen()
+            lsock.setblocking(False)
+            self.selector.register(lsock, selectors.EVENT_READ, data=LISTENING_SOCKET)
+        except Exception:
+            self.logger.error("Uncaught exception in LocalPeer.start_listening()")
+            self.logger.error(traceback.format_exc())
 
     def handle_incoming_connection(self, sock: socket.socket) -> None:
         self.logger.info("%15s LocalPeer.handle_incoming_connection()" % "")
