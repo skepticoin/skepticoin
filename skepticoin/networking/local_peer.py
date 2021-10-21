@@ -43,6 +43,7 @@ class LocalPeer:
 
         self.logger = logging.getLogger("skepticoin.networking.%s" % self.nonce)
         self.last_stats_output: str = ""
+        self.running = False
 
     def start_listening(self, port: int = PORT) -> None:
         self.port = port
