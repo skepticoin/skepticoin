@@ -22,6 +22,7 @@ from .params import (
     IBD_VALIDATION_SKIP,
     MAX_CONNECTION_ATTEMPTS,
     TIME_TO_SECOND_CONNECTION_ATTEMPT,
+    MAX_TIME_BETWEEN_CONNECTION_ATTEMPTS,
 )
 from skepticoin.datatypes import Block, Transaction
 from skepticoin.networking.params import MAX_MESSAGE_SIZE
@@ -150,7 +151,9 @@ class DisconnectedRemotePeer(RemotePeer):
     def is_time_to_connect(self, current_time: int) -> bool:
         if self.ban_score > MAX_CONNECTION_ATTEMPTS:
             return False
-        time_between = TIME_TO_SECOND_CONNECTION_ATTEMPT * pow(2, self.ban_score)
+        time_between = min(
+            TIME_TO_SECOND_CONNECTION_ATTEMPT * pow(2, self.ban_score),
+            MAX_TIME_BETWEEN_CONNECTION_ATTEMPTS)
         return ((self.last_connection_attempt is None) or
                 (current_time - self.last_connection_attempt >= time_between))
 
