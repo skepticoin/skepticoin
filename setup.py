@@ -7,7 +7,12 @@ setup(
     long_description_content_type='text/markdown',
 
     author="Sashimi Houdini",
-    url="https://github.com/skepticoin/skepticoin/",
+    url="https://www.skepticoin.org/",
+    project_urls={
+        "Github": "https://github.com/skepticoin/skepticoin/",
+        "Reddit": "https://reddit.com/r/skepticoin",
+        "Twitter": "https://www.twitter.com/Skepticoinz",
+    },
 
     install_requires=[
         "scrypt>=0.8.17",
