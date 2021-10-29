@@ -37,7 +37,8 @@ def wait_for_fresh_chain(thread: NetworkingThread) -> None:
     """
     while thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN) < time():
         thread.local_peer.show_stats()
-        print("Waiting for fresh chain")
+        diff = int(time() - thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN))
+        print(f"Waiting for fresh chain (your chain is {diff:,} seconds too old for my tastes)")
         sleep(10)
 
 
