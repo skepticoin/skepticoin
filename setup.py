@@ -14,6 +14,8 @@ setup(
         "Twitter": "https://www.twitter.com/Skepticoinz",
     },
 
+    python_requires='>=3.7.*',
+
     install_requires=[
         "scrypt>=0.8.17",
         "ecdsa>=0.16.1",
