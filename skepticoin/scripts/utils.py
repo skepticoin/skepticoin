@@ -13,7 +13,6 @@ from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
-from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.humans import computer, human
 
 
@@ -33,11 +32,11 @@ def check_chain_dir() -> None:
 
 def wait_for_fresh_chain(thread: NetworkingThread) -> None:
     """
-    Wait until your chain is no more than 20 typical block-sizes old before you start mining yourself
+    Wait until your chain is no more than 10 days old before you start mining yourself
     """
-    while thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN) < time():
+    while thread.local_peer.chain_manager.coinstate.head().timestamp + (10 * 24 * 60 * 60) < time():
         thread.local_peer.show_stats()
-        diff = int(time() - thread.local_peer.chain_manager.coinstate.head().timestamp + (20 * DESIRED_BLOCK_TIMESPAN))
+        diff = int(time() - thread.local_peer.chain_manager.coinstate.head().timestamp + (10 * 24 * 60 * 60))
         print(f"Waiting for fresh chain (your chain is {diff:,} seconds too old for my tastes)")
         sleep(10)
 
