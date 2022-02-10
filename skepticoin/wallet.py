@@ -87,7 +87,7 @@ class Wallet:
         return sum(
             coinstate.public_key_balances_by_hash[coinstate.current_chain_hash].get(  # type: ignore
                 SECP256k1PublicKey(pk), PKBalance(0, [])).value
-            for pk in self.keypairs.keys()
+            for pk in self.public_key_annotations.keys()
         )
 
 
