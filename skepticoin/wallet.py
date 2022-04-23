@@ -46,6 +46,8 @@ class Wallet:
         return public_key in self.keypairs
 
     def get_annotated_public_key(self, annotation: str) -> bytes:
+        if len(self.unused_public_keys) == 0:
+            self.generate_key()
         public_key = self.unused_public_keys.pop()
         self.public_key_annotations[public_key] = annotation
         return public_key
