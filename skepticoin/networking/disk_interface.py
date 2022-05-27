@@ -76,7 +76,11 @@ class DiskInterface:
             self.last_saved_peers = db
 
     def write_chain_to_disk(self, coinstate: CoinState, path: str = 'chain.db') -> None:
-        db = leveldb.DB(path, create_if_missing=True)
+        try:
+            db = leveldb.DB(path, create_if_missing=True)
+        except Exception as e:
+            print('Unable to open database, will ignore it: ' + str(e))
+            return
         for hash in coinstate.block_by_hash.keys():
             if db.get(hash) is None:
                 with io.BytesIO() as buffer:
