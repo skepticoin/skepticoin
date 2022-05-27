@@ -4,10 +4,12 @@ from pathlib import Path
 from time import sleep, time
 from typing import Any, Optional
 import os
+import io
 import tempfile
 import logging
 import argparse
 import pickle
+import plyvel as leveldb
 
 from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
@@ -41,15 +43,25 @@ def wait_for_fresh_chain(thread: NetworkingThread) -> None:
         sleep(10)
 
 
-def read_chain_from_disk() -> CoinState:
-    if os.path.isfile('chain.cache'):
-        print("Reading cached chain")
-        with open('chain.cache', 'rb') as file:
-            coinstate = CoinState.load(lambda: pickle.load(file))
-    else:
-        coinstate = CoinState.zero()
+def read_chain_from_disk(path: str = 'chain.db') -> CoinState:
 
     rewrite = False
+
+    if os.path.isdir(path):
+        print("Reading chain database")
+        db = leveldb.DB(path)
+        with db.iterator() as it:
+            block_by_hash = {hash: Block.stream_deserialize(io.BytesIO(block)) for hash, block in it}
+        coinstate = CoinState.load(lambda: block_by_hash)
+        db.close()
+
+    elif os.path.isfile('chain.cache'):
+        print("Reading cached chain in legacy format")
+        with open('chain.cache', 'rb') as file:
+            coinstate = CoinState.load(lambda: pickle.load(file))
+        rewrite = True
+    else:
+        coinstate = CoinState.zero()
 
     if os.path.isdir('chain'):
         # the code below is no longer needed by normal users, but some old testcases still rely on it:
@@ -81,7 +93,15 @@ def read_chain_from_disk() -> CoinState:
                 rewrite = True
 
     if rewrite:
-        DiskInterface().write_chain_cache_to_disk(coinstate)
+        print("Rewriting chain in database format")
+        DiskInterface().write_chain_to_disk(coinstate)
+        # cleanup some old files
+        if os.path.isfile('chain.cache'):
+            print("Deleting old legacy chain.cache file")
+            os.remove('chain.cache')
+        if os.path.isfile('chain.cache.tmp'):
+            print("Deleting old temporary chain.cache.tmp file")
+            os.remove('chain.cache.tmp')
 
     return coinstate
 

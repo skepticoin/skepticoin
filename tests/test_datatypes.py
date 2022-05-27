@@ -99,5 +99,4 @@ def test_block_serialization():
             outputs=[Output(value=1582, public_key=SECP256k1PublicKey(b"g" * 64))],
         )] * 2,
     )
-
     serialize_and_deserialize(block)

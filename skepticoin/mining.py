@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import random
 import traceback
 from skepticoin.datatypes import Block, BlockHeader, BlockSummary, Transaction
+from skepticoin.networking.disk_interface import DiskInterface
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
 from typing import Any, Callable, Dict, List, Tuple
@@ -241,14 +242,12 @@ class MinerWatcher:
             # we didn't mine the block
             return
 
+        self.coinstate = self.coinstate.add_block(block, int(time()))
+
         self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
         self.network_thread.local_peer.network_manager.broadcast_block(block)
 
-        self.coinstate = self.coinstate.add_block(block, int(time()))
-
-        # Originally there was a disk write in this spot. During testing of the chain.cache changes,
-        # it was found there is a race condition between the mining thread and the networking thread.
-        # Better to skip the write here and just let the networking thread do it.
+        DiskInterface().write_chain_to_disk(self.coinstate)
 
         print(f"miner {miner_id} found block: {block_filename(block)}")
 

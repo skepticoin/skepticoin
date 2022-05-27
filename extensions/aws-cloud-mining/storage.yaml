@@ -6,7 +6,7 @@ Description: >
 
 Parameters:
   PublicBucketName:
-    Description: A public bucket for keeping and publishing the peers.json and chain.cache
+    Description: A public bucket for keeping and publishing the peers.json and chain.db
     Type: String
     MinLength: '1'
     Default: skepticoin
@@ -58,7 +58,7 @@ Resources:
 Outputs:
   PublicBucket:
     Value: !Ref PublicBucket
-    Description: Name of PUBLIC bucket for peers.json and chain.cache
+    Description: Name of PUBLIC bucket for peers.json and chain.db.tar
     Export:
       Name: PublicBucket
   PrivateBucket:
@@ -73,7 +73,7 @@ Outputs:
         - !GetAtt
           - PublicBucket
           - DomainName
-    Description: Name of public S3 bucket to hold peers.json and chain.cache
+    Description: Name of public S3 bucket to hold peers.json and chain.db.tar
   WebsiteURL:
     Value: !GetAtt PublicBucket.WebsiteURL
-    Description: URL for website hosted on S3 containing peers.json and chain.cache (PUBLIC)
+    Description: URL for website hosted on S3 containing peers.json and chain.db.tar (PUBLIC)

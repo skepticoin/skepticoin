@@ -185,14 +185,14 @@ Resources:
                 cd /tmp/skepticoin
                 aws s3 cp s3://$PRIVATE_BUCKET/wallet.json .
                 aws s3 cp s3://$PUBLIC_BUCKET/peers.json .
-                aws s3 cp s3://$PUBLIC_BUCKET/chain.cache .
+                aws s3 cp s3://$PUBLIC_BUCKET/chain.db.tar .
+                tar -xf chain.db.tar
+                rm chain.db.tar
 
-                # supress automatic download of uncached chain
-                mkdir chain
-
-                # perform a balance operation first, to update the chain.cache and peers.json
+                # perform a balance operation first, to update the published chain.db
                 PYTHONUNBUFFERED=1 skepticoin-balance >> $LOG 2>&1
-                aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.cache
+                tar -cf chain.db.tar chain.db/
+                aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.db.tar
 
                 # start mining
                 PYTHONUNBUFFERED=1 nohup skepticoin-mine ${SkepticoinMiningParams} >> $LOG 2>&1 &
