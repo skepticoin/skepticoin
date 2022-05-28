@@ -50,7 +50,7 @@ def main() -> None:
         }
 
         for module in [skepticoin.datatypes, skepticoin.networking.messages, skepticoin.signing, skepticoin.humans]:
-            for attr in module.__all__:  # type: ignore
+            for attr in module.__all__:
                 globals[attr] = getattr(module, attr)
 
         def configure(repl: PythonRepl) -> None:
