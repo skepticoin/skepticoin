@@ -3,7 +3,6 @@ from skepticoin.networking.disk_interface import DiskInterface
 
 from .utils import (
     open_or_init_wallet,
-    check_chain_dir,
     read_chain_from_disk,
     configure_logging_from_args,
     start_networking_peer_in_background,
@@ -19,7 +18,6 @@ def main() -> None:
     args = parser.parse_args()
     configure_logging_from_args(args)
 
-    check_chain_dir()
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
 
@@ -35,7 +33,7 @@ def main() -> None:
         wallet.get_balance(coinstate) / SASHIMI_PER_COIN, "SKEPTI at h. %s," % coinstate.head().height,
         datetime.fromtimestamp(coinstate.head().timestamp).isoformat())
 
-    DiskInterface().write_chain_cache_to_disk(coinstate)
+    DiskInterface().write_chain_to_disk(coinstate)
 
     print("Waiting for networking thread to exit.")
     thread.stop()

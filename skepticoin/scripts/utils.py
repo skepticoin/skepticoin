@@ -1,4 +1,4 @@
-from skepticoin.networking.disk_interface import DiskInterface
+from skepticoin.chain_db import DefaultDatabase
 import sys
 from pathlib import Path
 from time import sleep, time
@@ -7,13 +7,10 @@ import os
 import tempfile
 import logging
 import argparse
-import pickle
 
-from skepticoin.datatypes import Block
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
-from skepticoin.humans import computer, human
 
 
 class DefaultArgumentParser(argparse.ArgumentParser):
@@ -42,48 +39,7 @@ def wait_for_fresh_chain(thread: NetworkingThread) -> None:
 
 
 def read_chain_from_disk() -> CoinState:
-    if os.path.isfile('chain.cache'):
-        print("Reading cached chain")
-        with open('chain.cache', 'rb') as file:
-            coinstate = CoinState.load(lambda: pickle.load(file))
-    else:
-        coinstate = CoinState.zero()
-
-    rewrite = False
-
-    if os.path.isdir('chain'):
-        # the code below is no longer needed by normal users, but some old testcases still rely on it:
-        for filename in sorted(os.listdir('chain')):
-            (height_str, hash_str) = filename.split("-")
-            (height, hash) = (int(height_str), computer(hash_str))
-
-            if hash not in coinstate.block_by_hash:
-
-                if height % 1000 == 0:
-                    print(filename)
-
-                if os.path.getsize(f"chain/{filename}") == 0:
-                    print("Stopping at empty block file: %s" % filename)
-                    break
-
-                with open(Path("chain") / filename, 'rb') as f:
-                    try:
-                        block = Block.stream_deserialize(f)
-                    except Exception as e:
-                        raise Exception("Corrupted block on disk: %s" % filename) from e
-                    try:
-                        coinstate = coinstate.add_block_no_validation(block)
-                    except Exception:
-                        print("Failed to add block at height=%d, previous_hash=%s"
-                              % (block.height, human(block.header.summary.previous_block_hash)))
-                        break
-
-                rewrite = True
-
-    if rewrite:
-        DiskInterface().write_chain_cache_to_disk(coinstate)
-
-    return coinstate
+    return DefaultDatabase.instance.read_chain_from_disk()
 
 
 def open_or_init_wallet() -> Wallet:

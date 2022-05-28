@@ -139,7 +139,11 @@ class CoinState:
         sorted_blocks = list(block_by_hash.values())
         sorted_blocks.sort(key=lambda block: block.height)  # type: ignore
         for block in sorted_blocks:
-            coinstate = coinstate.add_block_no_validation(block)
+            try:
+                coinstate = coinstate.add_block_no_validation(block)
+            except Exception as e:
+                print(f'Failed to load block at height={coinstate.head().height}, error={e}')
+                break
         return coinstate
 
     def __repr__(self) -> str:

@@ -5,7 +5,6 @@ from skepticoin.networking.threading import NetworkingThread
 from skepticoin.scripts.utils import (
     configure_logging_from_args,
     DefaultArgumentParser,
-    check_chain_dir,
     read_chain_from_disk,
 )
 import cProfile
@@ -21,7 +20,6 @@ def test_main():
     # Initially were using an empty chain for this test.
     # And then we found that the performance of newer blocks is different!
     # coinstate = CoinState.zero()
-    check_chain_dir()
     coinstate = read_chain_from_disk()
 
     # we need to run in the current thread to profile it

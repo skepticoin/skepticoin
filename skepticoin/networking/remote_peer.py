@@ -486,7 +486,7 @@ class ConnectedRemotePeer(RemotePeer):
                     return
 
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
-                self.local_peer.disk_interface.write_chain_cache_to_disk(coinstate_changed)
+                self.local_peer.disk_interface.write_chain_to_disk(coinstate_changed)
             else:
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=False)
 

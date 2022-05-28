@@ -1,42 +1,16 @@
 import cProfile
-import pickle
+from skepticoin.chain_db import DefaultDatabase
 
-
-# Profiling results: before optimizations, Block Height 73000
-#   first run: 308 seconds
-#   - 86% of time is spent in io.open()
-#   - 10% in add_block_no_validation()
-#   - <5% in serialize()
-#   second run (disk cache in effect?): 42 seconds
-#   - 65% of time is spent in add_block_no_validation()
-#   - 25% of time is in serialize()
-# After optimization:
-#   first run: 14 seconds
-#   - this is fast enough for now, didn't analyse details.
-#   - later increased to 17 seconds after removing some of the hash() caching
-
-from skepticoin.scripts.utils import (
-    check_chain_dir,
-    read_chain_from_disk
-)
-from skepticoin.coinstate import CoinState
+# New profiling results using sqlite3
+# baseline:
+# - total time: 177 seconds, height=275000
+# - slowest methods:
+#       1375006   38.830    0.000   38.830    0.000 {method 'set' of 'immutables._map.Map' objects}
+#       2553496    5.129    0.000   53.375    0.000 serialization.py:21(serialize) -- related to signing.py
 
 
 def test_read_chain_from_disk():
 
-    check_chain_dir()
-
     with cProfile.Profile() as pr:
-        coinstate = pr.runcall(read_chain_from_disk)
+        pr.runcall(lambda: DefaultDatabase.instance.read_chain_from_disk())
         pr.print_stats()
-
-    with open('test.tmp', 'wb') as file:
-        coinstate.dump(lambda data: pickle.dump(data, file))
-
-
-def test_faster_read():
-
-    with open('test.tmp', 'rb') as file:
-        with cProfile.Profile() as pr:
-            pr.runcall(lambda: CoinState.load(lambda: pickle.load(file)))
-            pr.print_stats()

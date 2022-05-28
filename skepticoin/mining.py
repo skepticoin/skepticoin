@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 import random
 import traceback
+from skepticoin.chain_db import DefaultDatabase
 from skepticoin.datatypes import Block, BlockHeader, BlockSummary, Transaction
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
@@ -20,7 +21,6 @@ from skepticoin.cheating import MAX_KNOWN_HASH_HEIGHT
 from time import time
 from multiprocessing import Process, Queue
 from skepticoin.scripts.utils import (
-    check_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
@@ -71,7 +71,6 @@ class Miner:
                 summary, current_height = self.get_scrypt_input(nonce)
                 summary_hash = construct_summary_hash(summary, current_height)
                 self.send_message('scrypt_output', summary_hash)
-
                 nonce = (nonce + 1) % (1 << 32)
 
         except KeyboardInterrupt:
@@ -102,7 +101,6 @@ class MinerWatcher:
     def __call__(self) -> None:
         configure_logging_from_args(self.args)
 
-        check_chain_dir()
         self.coinstate = read_chain_from_disk()
 
         self.wallet = open_or_init_wallet()
@@ -241,14 +239,12 @@ class MinerWatcher:
             # we didn't mine the block
             return
 
-        self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
-        self.network_thread.local_peer.network_manager.broadcast_block(block)
+        DefaultDatabase.instance.write_block_to_disk(block)
 
         self.coinstate = self.coinstate.add_block(block, int(time()))
 
-        # Originally there was a disk write in this spot. During testing of the chain.cache changes,
-        # it was found there is a race condition between the mining thread and the networking thread.
-        # Better to skip the write here and just let the networking thread do it.
+        self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
+        self.network_thread.local_peer.network_manager.broadcast_block(block)
 
         print(f"miner {miner_id} found block: {block_filename(block)}")
 
