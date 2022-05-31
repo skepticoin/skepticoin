@@ -92,7 +92,7 @@ class MessageReceiver:
         if not self.magic_read and len(self.buffer) >= 4:
             magic = self.buffer[:4]
             if magic != MAGIC:
-                raise Exception("Insufficient magic")
+                raise Exception(f"Insufficient magic[{str(magic)}] from peer [{self.peer.debug()}]")
             else:
                 self.magic_read = True
 
@@ -192,6 +192,9 @@ class ConnectedRemotePeer(RemotePeer):
         self._next_msg_id: int = 0
         self.last_get_peers_sent_at: Optional[int] = None
         self.waiting_for_peers: bool = False
+
+    def debug(self) -> str:
+        return f'{self.host}:{self.port} {self.direction}'
 
     def as_disconnected(self) -> DisconnectedRemotePeer:
         return DisconnectedRemotePeer(self.host, self.port, self.direction,
