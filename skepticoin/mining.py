@@ -166,6 +166,7 @@ class MinerWatcher:
 
     def print_stats_line(self, timestamp: int) -> None:
         if self.args.quiet:
+            self.network_thread.local_peer.show_stats()
             return
 
         now = datetime.fromtimestamp(timestamp)

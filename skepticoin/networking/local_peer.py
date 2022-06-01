@@ -119,7 +119,7 @@ class LocalPeer:
             self.network_manager.handle_peer_disconnected(remote_peer)
 
         except Exception:
-            # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
+            # yes yes... sweeping things under the carpet here. until I actually RTFM and think thisthrough
             # (i.e. the whole business of unregistering things that are already in some half-baked state).
             # One path how you might end up here: a EVENT_WRITE is reached for a socket that was just closed
             # as a consequence of something that was read.
@@ -192,9 +192,16 @@ class LocalPeer:
         coinstate = self.chain_manager.coinstate
 
         out = "NETWORK - %d connected peers: \n" % len(self.network_manager.get_active_peers())
+
+        lines = []
+
         for p in self.network_manager.get_active_peers():
             # TODO: Fix inconsistent usage of datatypes for PORT. int or str, pick one!
-            out += "  %15s:%s %s,\n" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction)  # type: ignore
+            lines.append("  %15s:%s %s" % (
+                p.host, p.port if p.port != IRRELEVANT else "....", p.direction))  # type: ignore
+
+        lines.sort()
+        out += ",\n".join(lines) + "\n"
 
         out += "CHAIN - "
         for (head, lca) in coinstate.forks():
