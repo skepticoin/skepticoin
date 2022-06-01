@@ -25,7 +25,7 @@ def main() -> None:
     # blockchain to know the most current balance.
     thread = start_networking_peer_in_background(args, coinstate)
 
-    wait_for_fresh_chain(thread)
+    wait_for_fresh_chain(thread, freshness=300)
     coinstate = thread.local_peer.chain_manager.coinstate
     print("Chain up to date")
 

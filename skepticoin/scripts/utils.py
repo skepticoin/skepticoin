@@ -27,14 +27,14 @@ def check_chain_dir() -> None:
         print('Your ./chain/ directory is no longer needed: please delete it to stop this reminder.')
 
 
-def wait_for_fresh_chain(thread: NetworkingThread) -> None:
+def wait_for_fresh_chain(thread: NetworkingThread, freshness: int = 10*24*60*60) -> None:
     """
-    Wait until your chain is no more than 10 days old before you start mining yourself
+    Wait until your chain is no more than specified seconds old before you start mining yourself
     """
-    while thread.local_peer.chain_manager.coinstate.head().timestamp + (10 * 24 * 60 * 60) < time():
+    while thread.local_peer.chain_manager.coinstate.head().timestamp + freshness < time():
         thread.local_peer.show_stats()
-        diff = int(time() - thread.local_peer.chain_manager.coinstate.head().timestamp + (10 * 24 * 60 * 60))
-        print(f"Waiting for fresh chain (your chain is {diff:,} seconds too old for my tastes)")
+        diff = int(time() - thread.local_peer.chain_manager.coinstate.head().timestamp)
+        print(f"Waiting for fresh chain (your chain is {diff:,} seconds, too old for my tastes)")
         sleep(10)
 
 
