@@ -1,3 +1,4 @@
+import sys
 from decimal import Decimal
 from datetime import datetime, timedelta
 import random
@@ -74,7 +75,12 @@ class Miner:
                 nonce = (nonce + 1) % (1 << 32)
 
         except KeyboardInterrupt:
-            print(f"miner {self.miner_id} shutting down")
+            print(f"miner {self.miner_id} interrupted by user")
+            sys.exit(-1)
+
+        except Exception as e:
+            print(f"miner {self.miner_id} fatal exception: {str(e)}")
+            self.send_message('terminate', e)
 
 
 class MinerWatcher:
@@ -140,14 +146,10 @@ class MinerWatcher:
                 self.handle_received_message(queue_item)
 
         except KeyboardInterrupt:
-            pass
+            print("MinerWatcher interrupted by user")
 
         except Exception:
             print("Error in MinerWatcher message loop: " + traceback.format_exc())
-
-        finally:
-            print("Restoring unused public key")
-            self.wallet.restore_annotated_public_key(self.public_key, "reserved for potentially mined block")
 
             print("Stopping networking thread")
             self.network_thread.stop()
@@ -157,6 +159,10 @@ class MinerWatcher:
 
             for process in self.processes:
                 process.join()
+
+        finally:
+            print("Restoring unused public key")
+            self.wallet.restore_annotated_public_key(self.public_key, "reserved for potentially mined block")
 
     def print_stats_line(self, timestamp: int) -> None:
         if self.args.quiet:
@@ -188,6 +194,7 @@ class MinerWatcher:
         message_handlers: Dict[str, Callable[[int, Any], None]] = {
             "request_scrypt_input": self.handle_request_scrypt_input_message,
             "scrypt_output": self.handle_scrypt_output_message,
+            "terminate": self.handle_termination_message,
         }
 
         def handle_unknown_message(miner_id: int, data: Any) -> None:
@@ -195,6 +202,9 @@ class MinerWatcher:
 
         handler = message_handlers.get(message_type, handle_unknown_message)
         handler(miner_id, data)
+
+    def handle_termination_message(self, miner_id: int, data: Exception) -> None:
+        raise data
 
     def handle_request_scrypt_input_message(self, miner_id: int, data: int) -> None:
         nonce: int = data
