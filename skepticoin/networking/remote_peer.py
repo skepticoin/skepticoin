@@ -243,8 +243,8 @@ class ConnectedRemotePeer(RemotePeer):
         data = header.serialize() + message.serialize()
 
         self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.send_message(%s %s len=%d)"
-            % (self.host, type(message).__name__, header.format(), len(data)))
+            "%15s:%d send_message %s %s len=%d"
+            % (self.host, self.port, type(message).__name__, header.format(), len(data)))
 
         self.send_backlog.append((MAGIC + struct.pack(b">I", len(data)) + data))
 
@@ -263,8 +263,8 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
 
     def handle_message_received(self, header: MessageHeader, message: Message) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_message_received(%s %s)" % (
-            self.host, type(message).__name__, header.format()))
+        self.local_peer.logger.info("%15s:%d received: %s %s" % (
+            self.host, self.port, type(message).__name__, header.format()))
 
         if isinstance(message, HelloMessage):
             return self.handle_hello_message_received(header, message)
@@ -293,8 +293,8 @@ class ConnectedRemotePeer(RemotePeer):
         raise NotImplementedError("%s" % message)
 
     def handle_can_send(self, sock: socket.socket) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)"
-                                    % (self.host, len(self.send_buffer), len(self.send_backlog)))
+        self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)"
+                                     % (self.host, len(self.send_buffer), len(self.send_backlog)))
 
         sent = sock.send(self.send_buffer)
         self.send_buffer = self.send_buffer[sent:]
@@ -307,14 +307,15 @@ class ConnectedRemotePeer(RemotePeer):
                 self.handle_can_send(sock)
 
     def handle_receive_data(self, data: bytes) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data(%d)" % (self.host, len(data)))
+        self.local_peer.logger.info("%15s:%d ConnectedRemotePeer.handle_receive_data(%d)"
+                                    % (self.host, self.port, len(data)))
         self.receiver.receive(data)
 
     def handle_hello_message_received(
         self, header: MessageHeader, message: HelloMessage
     ) -> None:
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_hello_message_received(%s)" % (self.host, str(message.user_agent)))
+        self.local_peer.logger.info("%15s:%d ConnectedRemotePeer.handle_hello_message_received(%s)"
+                                    % (self.host, self.port, str(message.user_agent)))
         self.hello_received = True
         self.ban_score = 0
 
@@ -328,7 +329,8 @@ class ConnectedRemotePeer(RemotePeer):
             nm._sanity_check()
             if key in nm.disconnected_peers:
                 # this is likely due to lack of a network return path, e.g. home Internet users without a DMZ
-                self.local_peer.logger.info("%15s incoming with ban_score=%d" % (self.host, self.ban_score))
+                self.local_peer.logger.info("%15s:%d incoming with ban_score=%d"
+                                            % (self.host, self.port, self.ban_score))
             elif key not in nm.connected_peers:
                 nm.disconnected_peers[key] = DisconnectedRemotePeer(self.host, message.my_port, OUTGOING,
                                                                     last_connection_attempt=None, ban_score=0)
@@ -341,12 +343,13 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.disk_interface.write_peers(self.local_peer.network_manager.connected_peers)
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
+        self.local_peer.logger.info("%15s:%d ConnectedRemotePeer.handle_get_blocks_message_received()"
+                                    % (self.host, self.port))
 
         coinstate = self.local_peer.chain_manager.coinstate
-        self.local_peer.logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
+        self.local_peer.logger.debug("%15s:%d ... at coinstate %s" % (self.host, self.port, coinstate))
         for potential_start_hash in message.potential_start_hashes:
-            self.local_peer.logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
+            self.local_peer.logger.debug("%15s ... potential_start_hash %s" % (self.host, human(potential_start_hash)))
             if potential_start_hash in coinstate.block_by_hash:
                 start_height = coinstate.block_by_hash[potential_start_hash].height + 1  # + 1: sent hash is last known
                 if start_height not in coinstate.by_height_at_head():
@@ -365,15 +368,15 @@ class ConnectedRemotePeer(RemotePeer):
             InventoryItem(DATA_BLOCK, coinstate.by_height_at_head()[height].hash())
             for height in range(start_height, min(start_height + GET_BLOCKS_INVENTORY_SIZE, max_height))
         ]
-        self.local_peer.logger.info("%15s ... returning from start_height=%d, %d items"
-                                    % (self.host, start_height, len(items)))
+        self.local_peer.logger.info("%15s:%d ... returning from start_height=%d, %d items"
+                                    % (self.host, self.port, start_height, len(items)))
         self.send_message(InventoryMessage(items), prev_header=header)
 
     def handle_inventory_message_received(
         self, header: MessageHeader, message: InventoryMessage
     ) -> None:
-        self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_inventory_message_received(%d)" % (self.host, len(message.items)))
+        self.local_peer.logger.info("%15s:%d ConnectedRemotePeer.handle_inventory_message_received(%d)"
+                                    % (self.host, self.port, len(message.items)))
         if len(message.items) > 0:
             self.local_peer.logger.info(
                 "%15s %s .. %s" % (self.host, human(message.items[0].hash), human(message.items[-1].hash)))
@@ -437,7 +440,7 @@ class ConnectedRemotePeer(RemotePeer):
 
     def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
         self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_data_message_received(type=%s format=%s)" % (
+            "%15s recv %s %s" % (
              self.host, str(DATATYPES[message.data_type]), header.format()))
 
         if message.data_type == DATA_BLOCK:
@@ -552,8 +555,9 @@ class ConnectedRemotePeer(RemotePeer):
 
             if key in nm.disconnected_peers:
                 if nm.disconnected_peers[key].ban_score > 0:
-                    self.local_peer.logger.info("%15s (ban_score=%d) is broadcasting peer %s (ban_score=%d)" %
-                                                (self.host, self.ban_score, nm.disconnected_peers[key].host,
+                    self.local_peer.logger.info("%15s:%d (ban_score=%d) is broadcasting peer %s:%d (ban_score=%d)" %
+                                                (self.host, self.port, self.ban_score, nm.disconnected_peers[key].host,
+                                                 nm.disconnected_peers[key].port,
                                                  nm.disconnected_peers[key].ban_score))
 
             elif key not in nm.connected_peers:

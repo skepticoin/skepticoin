@@ -72,7 +72,7 @@ class MessageHeader(Serializable):
         f.write(b'\x00' * 32)  # reserved space for later versions
 
     def format(self) -> str:
-        return "ts: %s, id: %010d, req: %010d, ctx: %020d" % (
+        return "ts:%s id:%010d req:%010d ctx:%020d" % (
             datetime.datetime.fromtimestamp(self.timestamp).astimezone().isoformat(),
             self.id, self.in_response_to, self.context)
 

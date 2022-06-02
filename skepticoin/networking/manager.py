@@ -70,6 +70,8 @@ class NetworkManager(Manager):
                 self.local_peer.start_outgoing_connection(disconnected_peer)
 
         for peer in list(self.connected_peers.values()):
+            if peer.waiting_for_inventory:
+                self.local_peer.logger.info("%15s:%d %s waiting for inventory" % (peer.host, peer.port, peer.direction))
             peer.step(current_time)
 
     def handle_peer_connected(self, remote_peer: ConnectedRemotePeer) -> None:
@@ -184,6 +186,10 @@ class ChainManager(Manager):
         self.actively_fetching_blocks_from_peers.append((current_time + IBD_PEER_TIMEOUT, remote_peer))
         remote_peer.send_message(get_blocks_message)
 
+        self.local_peer.logger.info('%15s:%d GetBlocksMessage %s'
+                                    % (remote_peer.host, remote_peer.port,
+                                       ' '.join([human(hash) for hash in get_blocks_message.potential_start_hashes])))
+
         # timeout is only implemented half-baked: it currently only limits when an new GetBlocksMessage will be sent;
         # but doesn't take the timed-out peer out of the loop that it's already in. This is not necessarily a bad thing.
 
@@ -197,7 +203,10 @@ class ChainManager(Manager):
 
     def set_coinstate(self, coinstate: CoinState, validated: bool = True) -> None:
         with self.lock:
-            self.local_peer.logger.info("%15s ChainManager.set_coinstate(%s)" % ("", coinstate))
+            if coinstate.current_chain_hash is not None:
+                self.local_peer.logger.info("HEIGHT=%08d (%d heads) HASH=%s @ ChainManager.set_coinstate"
+                                            % (coinstate.head().height, len(coinstate.heads),
+                                               human(coinstate.current_chain_hash)))
             self.coinstate = coinstate
             self._cleanup_transaction_pool_for_coinstate(coinstate)
             if validated:

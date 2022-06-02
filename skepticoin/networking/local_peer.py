@@ -97,13 +97,13 @@ class LocalPeer:
 
         except OSError as e:  # e.g. ConnectionRefusedError, "Bad file descriptor"
             # no print-to-screen for this one
-            self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
+            self.logger.info("%15s:%d Disconnecting remote peer %s" % (remote_peer.host, remote_peer.port, e))
             self.disconnect(remote_peer, "OS error")
 
         except Exception as e:
             # We take the position that any exception caused is reason to disconnect. This allows the code that talks to
             # peers to not have special cases for exceptions since they will all be caught by this catch-all.
-            self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
+            self.logger.info("%15s:%d Disconnecting remote peer %s" % (remote_peer.host, remote_peer.port, e))
 
             if "ValueError: Invalid file descriptor: " not in str(e):
                 self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
@@ -134,7 +134,8 @@ class LocalPeer:
             # TODO this is actually a hack, find a proper solution
             return
 
-        self.logger.info("%15s LocalPeer.start_outgoing_connection()" % disconnected_peer.host)
+        self.logger.info("%15s:%d LocalPeer.start_outgoing_connection()"
+                         % (disconnected_peer.host, disconnected_peer.port))
 
         server_addr = (disconnected_peer.host, disconnected_peer.port)
 
