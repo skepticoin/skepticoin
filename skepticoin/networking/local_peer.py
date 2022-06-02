@@ -177,8 +177,9 @@ class LocalPeer:
             self.stop()
 
         except Exception:
-            self.logger.error("Uncaught exception in LocalPeer.run()")
-            self.logger.error(traceback.format_exc())
+            print("FATAL ERROR: Uncaught exception in LocalPeer.run()")
+            print(traceback.format_exc())
+            sys.exit(-1)
         finally:
             self.logger.info("%15s LocalPeer selector close" % "")
             self.selector.close()
