@@ -194,6 +194,8 @@ class ConnectedRemotePeer(RemotePeer):
         self.last_get_peers_sent_at: Optional[int] = None
         self.waiting_for_peers: bool = False
 
+        self.closed = False
+
     def debug(self) -> str:
         return f'{self.host}:{self.port} {self.direction}'
 

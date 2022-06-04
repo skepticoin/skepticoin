@@ -116,6 +116,7 @@ class LocalPeer:
         try:
             self.selector.unregister(remote_peer.sock)
             remote_peer.sock.close()
+            remote_peer.closed = True
             self.network_manager.handle_peer_disconnected(remote_peer)
 
         except Exception:
