@@ -405,6 +405,9 @@ class ConnectedRemotePeer(RemotePeer):
         self.check_inventory_messages()
 
         # speed optimization: go ahead and ask for more inventory now, there is no reason to wait
+        self.local_peer.logger.info("%15s preparing GetBlocksMessage from %s"
+                                    % (self.host, human(message.items[-1].hash)))
+
         get_blocks_message = GetBlocksMessage([message.items[-1].hash])
         self.send_message(get_blocks_message, prev_header=header)
 
