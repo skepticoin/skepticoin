@@ -194,6 +194,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.last_get_peers_sent_at: Optional[int] = None
         self.waiting_for_peers: bool = False
 
+        self.next_starting_height = 1
         self.closed = False
 
     def debug(self) -> str:
@@ -365,15 +366,22 @@ class ConnectedRemotePeer(RemotePeer):
                     # this final if checks that this particular potential_start_hash is on our active chain
                     break
         else:  # no break
-            start_height = 1  # genesis is last known
+            start_height = 1
         max_height = coinstate.head().height + 1  # + 1: range is exclusive, but we need to send this last block also
+
+        if start_height < self.next_starting_height:
+            start_height = self.next_starting_height
+
+        end_height = min(start_height + GET_BLOCKS_INVENTORY_SIZE, max_height)
         items = [
             InventoryItem(DATA_BLOCK, coinstate.by_height_at_head()[height].hash())
-            for height in range(start_height, min(start_height + GET_BLOCKS_INVENTORY_SIZE, max_height))
+            for height in range(start_height, end_height)
         ]
         self.local_peer.logger.info("%15s:%d ... returning from start_height=%d, %d items"
                                     % (self.host, self.port, start_height, len(items)))
         self.send_message(InventoryMessage(items), prev_header=header)
+
+        self.next_starting_height = end_height
 
     def handle_inventory_message_received(
         self, header: MessageHeader, message: InventoryMessage
