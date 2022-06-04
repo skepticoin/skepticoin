@@ -21,6 +21,7 @@ from .params import (
     GET_PEERS_INTERVAL,
     IBD_VALIDATION_SKIP,
     MAX_CONNECTION_ATTEMPTS,
+    PORT,
     TIME_TO_SECOND_CONNECTION_ATTEMPT,
     MAX_TIME_BETWEEN_CONNECTION_ATTEMPTS,
 )
@@ -546,6 +547,11 @@ class ConnectedRemotePeer(RemotePeer):
             ipv4_mapped = announced_peer.ip_address.ipv4_mapped
             if ipv4_mapped is None:
                 continue  # IPv6? Ain't nobody got time for that! (Seriously though, the protocol supports it if needed)
+
+            if announced_peer.port != PORT:
+                # this shouldn't happen, but it keeps happening and causes "Error 113: No route to host"
+                continue
+
             host = ipv4_mapped.exploded
 
             # TODO factor out copypasta
