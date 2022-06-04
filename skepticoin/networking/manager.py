@@ -164,7 +164,7 @@ class ChainManager(Manager):
             for (timeout_at, p) in self.actively_fetching_blocks_from_peers
             if current_time < timeout_at and not inventory_batch_handled(p) and not p.closed]
 
-        if len(self.actively_fetching_blocks_from_peers) > MAX_IBD_PEERS:
+        if len(self.actively_fetching_blocks_from_peers) >= MAX_IBD_PEERS:
             return
 
         # at this point len(self.actively_fetching_blocks_from_peers) == 0
@@ -179,7 +179,6 @@ class ChainManager(Manager):
 
         get_blocks_message = self.get_get_blocks_message()
 
-        # TODO once MAX_IBD_PEERS > 1... pick one that you haven't picked before? potentially :-D
         remote_peer = random.choice(ibd_candidates)
         remote_peer.waiting_for_inventory = True
         self.actively_fetching_blocks_from_peers.append((current_time + IBD_PEER_TIMEOUT, remote_peer))
