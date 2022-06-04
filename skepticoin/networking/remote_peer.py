@@ -506,16 +506,15 @@ class ConnectedRemotePeer(RemotePeer):
                     return
 
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
-                self.local_peer.disk_interface.write_chain_to_disk(coinstate_changed)
             else:
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=False)
 
-            if block == coinstate_changed.head() and header.in_response_to == 0:
-                # "header.in_response_to == 0" is being used as a bit of a proxy for "not in IBD" here, but it would be
-                # better to check for that state more explicitly. We don't want to broadcast blocks while in IBD,
-                # because in that state the fact that some block is our new head doesn't mean at all that we're talking
-                # about the real chain's new head, and only the latter is relevant to the rest of the world.
+            if header.in_response_to == 0 and block == coinstate_changed.head():
+                # New blocks are re-broadcast once by every peer receiving them the first time...
+                # that burns O(N) messages to mitigate risk of network partitioning.
                 self.local_peer.network_manager.broadcast_block(block)
+
+            self.local_peer.disk_interface.write_block_to_disk(block)
 
     def handle_transaction_received(
         self, header: MessageHeader, message: DataMessage

@@ -250,12 +250,14 @@ class MinerWatcher:
             # we didn't mine the block
             return
 
-        DefaultDatabase.instance.write_block_to_disk(block)
+        # When a new block is found, our most urgent priority is to get it immediatelly transmitted to
+        # other peers. This minimizes the probability that the chain will fork due to a competing block
+        # being found.
+        self.network_thread.local_peer.network_manager.broadcast_block(block)
 
         self.coinstate = self.coinstate.add_block(block, int(time()))
 
         self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
-        self.network_thread.local_peer.network_manager.broadcast_block(block)
 
         print(f"miner {miner_id} found block: {block_filename(block)}")
 
@@ -264,3 +266,9 @@ class MinerWatcher:
         save_wallet(self.wallet)
 
         self.balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
+
+        if len(self.network_thread.local_peer.network_manager.get_active_peers()) == 0:
+            # This is an edge case. When peers are connected, we wait to write the newly mined block until
+            # we receive it back from a peer. Skipping the write when peers are connected avoids the nuisance
+            # of a recoverable race condition.
+            DefaultDatabase.instance.write_block_to_disk(block)

@@ -1,7 +1,7 @@
 import os
 from skepticoin.chain_db import DefaultDatabase
 from skepticoin.coinstate import CoinState
-from skepticoin.datatypes import Transaction
+from skepticoin.datatypes import Block, Transaction
 from skepticoin.humans import human
 from skepticoin.networking.params import MAX_CONNECTION_ATTEMPTS
 from typing import Dict, List, Set, Tuple
@@ -80,3 +80,6 @@ class DiskInterface:
 
     def write_chain_to_disk(self, coinstate: CoinState) -> None:
         DefaultDatabase.instance.write_chain_to_disk(coinstate)
+
+    def write_block_to_disk(self, block: Block, commit: bool = True) -> None:
+        DefaultDatabase.instance.write_block_to_disk(block, commit)

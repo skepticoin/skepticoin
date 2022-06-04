@@ -34,6 +34,9 @@ class FakeDiskInterface:
     def save_transaction_for_debugging(self, transaction):
         pass
 
+    def write_block_to_disk(self, block: Block, commit: bool = True) -> None:
+        pass
+
 
 def _read_chain_from_disk(max_height):
     coinstate = CoinState.zero()
