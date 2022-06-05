@@ -103,6 +103,7 @@ class MinerWatcher:
         self.network_thread: NetworkingThread
         self.mining_args: Dict[int, Tuple[BlockSummary, int, List[Transaction]]] = {}
         self.public_key: bytes
+        self.log_silencer: List[Any] = []
 
     def __call__(self) -> None:
         configure_logging_from_args(self.args)
@@ -165,9 +166,18 @@ class MinerWatcher:
             self.wallet.restore_annotated_public_key(self.public_key, "reserved for potentially mined block")
 
     def print_stats_line(self, timestamp: int) -> None:
+
+        n_peers = len(self.network_thread.local_peer.network_manager.get_active_peers())
+        height = self.coinstate.head().height
+        forks = [True for (head, lca) in self.coinstate.forks()
+                 if head.height >= self.coinstate.head().height - 10 and head.height != lca.height]
+
         if self.args.quiet:
-            self.network_thread.local_peer.show_stats()
-            return
+            stat = [height, n_peers, forks]
+            if self.log_silencer == stat:
+                return
+            else:
+                self.log_silencer = stat
 
         now = datetime.fromtimestamp(timestamp)
         now_str = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -180,11 +190,11 @@ class MinerWatcher:
 
         mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
 
-        n_peers = len(self.network_thread.local_peer.network_manager.get_active_peers())
-
         print(f"{now_str} | uptime: {uptime_str} | {hashes:>3} hash/sec" +
               f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h" +
-              f" | {n_peers:3d} peers")
+              f" | {n_peers:3d} peers | h. {height}" +
+              f" @ {timestamp - self.coinstate.head().timestamp}s ago" +
+              (f" | {len(forks)} forks" if forks else ""))
 
     def send_message(self, miner_id: int, message_type: str, data: Any) -> None:
         self.send_queues[miner_id].put((message_type, data))
