@@ -50,6 +50,10 @@ Parameters:
     Type: Number
     Description: See https://forums.aws.amazon.com/thread.jspa?messageID=949532
     Default: 86400
+  SwapSpace:
+    Type: Number
+    Description: Amount of Linux swap space, in megabytes (integer).
+    Default: 512
 
 Resources:
   EC2InstanceRole:
@@ -107,6 +111,7 @@ Resources:
         configSets:
           MountConfig:
           - logs
+          - swap
           - workload
           - crontab
         logs: # send logs to CloudWatch
@@ -156,6 +161,18 @@ Resources:
               command: "amazon-cloudwatch-agent-ctl -a append-config -c file:/etc/cloudwatch-config.json"
             03_start:
               command: "amazon-cloudwatch-agent-ctl -m ec2 -a start"
+        swap:
+          commands:
+            01_dd:
+              command: !Sub "dd if=/dev/zero of=/swapfile bs=1024000 count=${SwapSpace}"
+            02_chmod:
+              command: "chmod 0600 /swapfile"
+            03_mkswap:
+              command: "mkswap /swapfile"
+            04_fstab:
+              command: "echo /swapfile swap swap defaults 0 0 >> /etc/fstab"
+            05_swapon:
+              command: "swapon -a"
         workload:
           files:
             "/home/ec2-user/workload":
