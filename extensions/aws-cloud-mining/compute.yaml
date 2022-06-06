@@ -279,3 +279,75 @@ Resources:
       - Key: Name
         Value: skepticoin-miner
         PropagateAtLaunch: 'true'
+
+  # Here we disable AZRebalance, a default behaviour of ASG which has been found under certain conditions
+  # to cause excessive reboots and IP address proliferation that are very destabilizing to the skepticoin
+  # peer network. This happens when a spot instance type has unstable capacity. It's not common, but it happened
+  # enough times to warrant this change. Solution modified from:
+  # https://stackoverflow.com/questions/54204110/add-suspended-processes-to-an-autoscaling-group-with-cloudformation
+
+  AsgProcessModificationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+      Policies:
+        - PolicyName: AsgProcessModification
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - autoscaling:ResumeProcesses
+              - autoscaling:SuspendProcesses
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              Resource: arn:aws:logs:*:*:*
+
+  AsgProcessModifierFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Modifies ASG processes during CF stack creation
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import boto3
+          def handler(event, context):
+            props = event['ResourceProperties']
+            client = boto3.client('autoscaling')
+            try:
+              response = client.suspend_processes(
+                  AutoScalingGroupName=props['AutoScalingGroupName'],
+                  ScalingProcesses=['AZRebalance']
+              )
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+            except Exception as e:
+              cfnresponse.send(event, context, cfnresponse.FAILED, {})
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - AsgProcessModificationRole
+        - Arn
+      Runtime: python3.9
+
+  ModifyAsg:
+    Type: AWS::CloudFormation::CustomResource
+    Version: 1
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+        - AsgProcessModifierFunction
+        - Arn
+      AutoScalingGroupName:
+        Ref: AutoScalingGroup

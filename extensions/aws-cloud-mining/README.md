@@ -5,15 +5,15 @@ This Skepticoin Extension enables the option to run Skepticoin Mining on the Ama
 
 ## Why?
 
-Runnning skepticoin miners on AWS is ultimately an asinine idea, because you'll be spending real money payable to a third party, rather than mooching off your existing "free" eletricity supply (assuming someone else is paying for that) and idle hardware.
+Runnning skepticoin miners on AWS is usually a bad idea, especially if you already have access to idle hardware and cheap electricity.
 
 ## No really, WHY??
 
-Despite being an overall terrible idea, there are a couple of reasons you might still feel compelled to Cloud Mine, one of which is selfish, while the other one is good for the Skepticoin Community:
+Despite being generally a bad idea, there are a couple of scenarios when you might still feel compelled to Cloud Mine:
 
-1. You feel the FOMO and you really want to mine some Skeptis, but your existing computers are already busy doing other things such as gaming, or attending Zoom meetings, both of which don't co-exist well with skepticoin mining.
+1. You feel the FOMO and you really want to mine some Skeptis, but your existing computers are already busy doing other things such as gaming, or attending Zoom meetings, both of which don't co-exist well with skepticoin mining. Running on AWS in this case is good for you since you have no other option.
 
-2. Running some nodes on business-grade infrastructure helps the overall stability of the Skepticoin peer-to-peer network. Cloud mining nodes are configured with bi-directional connectivity, which can be a challenge to setup correctly on a home Internet router.
+2. Running some nodes on business-grade infrastructure helps the overall stability of the Skepticoin peer-to-peer network. Cloud mining nodes are configured with bi-directional connectivity, which can be a challenge to setup correctly on a home Internet router. This is good for Skepticoin.
 
 ## How to Use
 
