@@ -3,7 +3,6 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 import random
 import traceback
-from skepticoin.chain_db import DefaultDatabase
 from skepticoin.datatypes import Block, BlockHeader, BlockSummary, Transaction
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
@@ -281,4 +280,4 @@ class MinerWatcher:
             # This is an edge case. When peers are connected, we wait to write the newly mined block until
             # we receive it back from a peer. Skipping the write when peers are connected avoids the nuisance
             # of a recoverable race condition.
-            DefaultDatabase.instance.write_block_to_disk(block)
+            self.network_thread.local_peer.disk_interface.write_chain_to_disk(self.coinstate)

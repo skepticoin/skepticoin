@@ -66,10 +66,14 @@ class BlockChainDatabase:
             self.connection.commit()
 
     def write_chain_to_disk(self, coinstate: CoinState) -> None:
-
         try:
-            for hash in coinstate.block_by_hash.keys():
-                block = coinstate.block_by_hash[hash]
+            cur = self.connection.cursor()
+            for row in cur.execute("select max(height) from chain"):
+                height = row[0] or 0
+            cur.close()
+            blocks = [block for block in coinstate.block_by_hash.values() if block.height >= height]
+            blocks.sort(key=lambda block: block.height)  # type: ignore
+            for block in blocks:
                 self.write_block_to_disk(block, commit=False)
             self.connection.commit()
 

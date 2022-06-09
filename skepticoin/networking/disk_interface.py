@@ -1,7 +1,8 @@
+from concurrent.futures import ThreadPoolExecutor
 import os
 from skepticoin.chain_db import DefaultDatabase
 from skepticoin.coinstate import CoinState
-from skepticoin.datatypes import Block, Transaction
+from skepticoin.datatypes import Transaction
 from skepticoin.humans import human
 from skepticoin.networking.params import MAX_CONNECTION_ATTEMPTS
 from typing import Dict, List, Set, Tuple
@@ -46,6 +47,7 @@ class DiskInterface:
 
     def __init__(self) -> None:
         self.last_saved_peers: List[Tuple[str, int, str]] = []
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
     def load_peers(self) -> Dict[Tuple[str, int, str], DisconnectedRemotePeer]:
         try:
@@ -79,7 +81,4 @@ class DiskInterface:
             f.write(transaction.serialize())
 
     def write_chain_to_disk(self, coinstate: CoinState) -> None:
-        DefaultDatabase.instance.write_chain_to_disk(coinstate)
-
-    def write_block_to_disk(self, block: Block, commit: bool = True) -> None:
-        DefaultDatabase.instance.write_block_to_disk(block, commit)
+        self.executor.submit(lambda: DefaultDatabase.instance.write_chain_to_disk(coinstate))

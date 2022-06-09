@@ -34,7 +34,7 @@ class FakeDiskInterface:
     def save_transaction_for_debugging(self, transaction):
         pass
 
-    def write_block_to_disk(self, block: Block, commit: bool = True) -> None:
+    def write_chain_to_disk(self, coinstate: CoinState) -> None:
         pass
 
 

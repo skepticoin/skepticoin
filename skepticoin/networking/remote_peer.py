@@ -506,6 +506,7 @@ class ConnectedRemotePeer(RemotePeer):
                     return
 
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
+                self.local_peer.disk_interface.write_chain_to_disk(coinstate_changed)
             else:
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=False)
 
@@ -513,8 +514,6 @@ class ConnectedRemotePeer(RemotePeer):
                 # New blocks are re-broadcast once by every peer receiving them the first time...
                 # that burns O(N) messages to mitigate risk of network partitioning.
                 self.local_peer.network_manager.broadcast_block(block)
-
-            self.local_peer.disk_interface.write_block_to_disk(block)
 
     def handle_transaction_received(
         self, header: MessageHeader, message: DataMessage
