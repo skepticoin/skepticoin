@@ -50,6 +50,10 @@ Parameters:
     Type: Number
     Description: See https://forums.aws.amazon.com/thread.jspa?messageID=949532
     Default: 86400
+  SwapSpace:
+    Type: Number
+    Description: Amount of Linux swap space, in megabytes (integer).
+    Default: 512
 
 Resources:
   EC2InstanceRole:
@@ -107,6 +111,7 @@ Resources:
         configSets:
           MountConfig:
           - logs
+          - swap
           - workload
           - crontab
         logs: # send logs to CloudWatch
@@ -156,6 +161,18 @@ Resources:
               command: "amazon-cloudwatch-agent-ctl -a append-config -c file:/etc/cloudwatch-config.json"
             03_start:
               command: "amazon-cloudwatch-agent-ctl -m ec2 -a start"
+        swap:
+          commands:
+            01_dd:
+              command: !Sub "dd if=/dev/zero of=/swapfile bs=1024000 count=${SwapSpace}"
+            02_chmod:
+              command: "chmod 0600 /swapfile"
+            03_mkswap:
+              command: "mkswap /swapfile"
+            04_fstab:
+              command: "echo /swapfile swap swap defaults 0 0 >> /etc/fstab"
+            05_swapon:
+              command: "swapon -a"
         workload:
           files:
             "/home/ec2-user/workload":
@@ -214,7 +231,7 @@ Resources:
               # - Every hour, copy the up-to-date local peers.json back into the public S3 bucket. It'll be overwritten by each node, which is inefficient but fine.
               content: !Sub
                 - |
-                  */15 * * * * nc -zv 127.0.0.1 2412 || aws autoscaling set-instance-health --region ${AWS::Region} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --health-status Unhealthy
+                  */15 * * * * sleep 900; nc -zv 127.0.0.1 2412 || aws autoscaling set-instance-health --region ${AWS::Region} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --health-status Unhealthy
                   0 * * * * cd /tmp/skepticoin && aws s3 cp peers.json s3://${PUBLIC_BUCKET}/
                 - PUBLIC_BUCKET: !ImportValue "PublicBucket"
           commands:
@@ -246,7 +263,7 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT10M
+        Timeout: PT15M
         Count:
           Ref: AsgMaxSize
     Properties:
@@ -265,3 +282,75 @@ Resources:
       - Key: Name
         Value: skepticoin-miner
         PropagateAtLaunch: 'true'
+
+  # Here we disable AZRebalance, a default behaviour of ASG which has been found under certain conditions
+  # to cause excessive reboots and IP address proliferation that are very destabilizing to the skepticoin
+  # peer network. This happens when a spot instance type has unstable capacity. It's not common, but it happened
+  # enough times to warrant this change. Solution modified from:
+  # https://stackoverflow.com/questions/54204110/add-suspended-processes-to-an-autoscaling-group-with-cloudformation
+
+  AsgProcessModificationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+      Policies:
+        - PolicyName: AsgProcessModification
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - autoscaling:ResumeProcesses
+              - autoscaling:SuspendProcesses
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              Resource: arn:aws:logs:*:*:*
+
+  AsgProcessModifierFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Modifies ASG processes during CF stack creation
+      Code:
+        ZipFile: |
+          import cfnresponse
+          import boto3
+          def handler(event, context):
+            props = event['ResourceProperties']
+            client = boto3.client('autoscaling')
+            try:
+              response = client.suspend_processes(
+                  AutoScalingGroupName=props['AutoScalingGroupName'],
+                  ScalingProcesses=['AZRebalance']
+              )
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+            except Exception as e:
+              cfnresponse.send(event, context, cfnresponse.FAILED, {})
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - AsgProcessModificationRole
+        - Arn
+      Runtime: python3.9
+
+  ModifyAsg:
+    Type: AWS::CloudFormation::CustomResource
+    Version: 1
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+        - AsgProcessModifierFunction
+        - Arn
+      AutoScalingGroupName:
+        Ref: AutoScalingGroup
