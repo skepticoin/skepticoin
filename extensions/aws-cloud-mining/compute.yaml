@@ -204,9 +204,6 @@ Resources:
                 aws s3 cp s3://$PUBLIC_BUCKET/peers.json .
                 aws s3 cp s3://$PUBLIC_BUCKET/chain.db .
 
-                # supress automatic download of uncached chain
-                mkdir chain
-
                 # perform a balance operation first, to update the chain.db and peers.json
                 PYTHONUNBUFFERED=1 skepticoin-balance >> $LOG 2>&1
                 aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.db
