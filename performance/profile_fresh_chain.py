@@ -5,7 +5,6 @@ from skepticoin.networking.threading import NetworkingThread
 from skepticoin.scripts.utils import (
     configure_logging_from_args,
     DefaultArgumentParser,
-    check_chain_dir,
     read_chain_from_disk,
 )
 import cProfile
@@ -21,7 +20,6 @@ def test_main():
     # Initially were using an empty chain for this test.
     # And then we found that the performance of newer blocks is different!
     # coinstate = CoinState.zero()
-    check_chain_dir()
     coinstate = read_chain_from_disk()
 
     # we need to run in the current thread to profile it
@@ -30,13 +28,19 @@ def test_main():
     def runner():
         started = datetime.now()
         nt.local_peer.running = True
-        print("start height = %d" % nt.local_peer.chain_manager.coinstate.head().height)
+        start_height = nt.local_peer.chain_manager.coinstate.head().height
+        print("start height = %d" % start_height)
         while (datetime.now() - started).seconds <= 100:
             current_time = int(time())
             nt.local_peer.step_managers(current_time)
             nt.local_peer.handle_selector_events()
-        print("final height = %d" % nt.local_peer.chain_manager.coinstate.head().height)
+        end_height = nt.local_peer.chain_manager.coinstate.head().height
+        print("final height = %d" % end_height)
+        elapsed = datetime.now() - started
+        return (start_height, end_height, elapsed)
 
     with cProfile.Profile() as pr:
-        pr.runcall(runner)
-        pr.print_stats()
+        (start_height, end_height, elapsed) = pr.runcall(runner)
+        tps = (end_height-start_height) // (elapsed.seconds/60)
+        pr.print_stats(sort='cumulative')
+        print(f"start={start_height} end={end_height} elapsed={elapsed} throughput={tps} bpm")

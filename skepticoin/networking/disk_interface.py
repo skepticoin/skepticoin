@@ -1,15 +1,14 @@
 import os
+from skepticoin.blockstore import DefaultBlockStore
 from skepticoin.networking.params import MAX_CONNECTION_ATTEMPTS
 from typing import Dict, List, Set, Tuple
-from skepticoin.datatypes import Transaction
+from skepticoin.datatypes import Block, Transaction
 from skepticoin.networking.remote_peer import (
     ConnectedRemotePeer, DisconnectedRemotePeer, OUTGOING, load_peers_from_list
 )
 import json
 import urllib.request
-import pickle
 from skepticoin.humans import human
-from skepticoin.coinstate import CoinState
 
 
 PEER_URLS: List[str] = [
@@ -74,12 +73,11 @@ class DiskInterface:
 
             self.last_saved_peers = db
 
-    def write_chain_cache_to_disk(self, coinstate: CoinState) -> None:
-        # Currently this takes about 2 seconds. It could be optimized further
-        # if we switch to an appendable file format for the cache.
-        with open('chain.cache.tmp', 'wb') as file:
-            coinstate.dump(lambda data: pickle.dump(data, file))
-        os.replace('chain.cache.tmp', 'chain.cache')
+    def save_block(self, block: Block) -> None:
+        DefaultBlockStore.instance.add_block_to_buffer(block)
+
+    def flush_blocks(self) -> None:
+        DefaultBlockStore.instance.flush_blocks_to_disk()
 
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:

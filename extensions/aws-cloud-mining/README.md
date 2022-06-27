@@ -17,21 +17,21 @@ Despite being generally a bad idea, there are a couple of scenarios when you mig
 
 ## How to Use
 
-1. Pre-requisites: 
+1. Pre-requisites:
     - An AWS Account.
     - An EC2 Key Pair: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html
     - Cloud Formation templates downloaded to your computer (`network.yaml`, `storage.yaml`, `compute.yaml`). These are found in the same folder where this README is located.
-    - skepticoin files: `peers.json`, `chain.cache`, and `wallet.json`. You'll need to run skepticoin on your own computer first to obtain these files.
+    - skepticoin files: `peers.json`, `chain.db`, and `wallet.json`. You'll need to run skepticoin on your own computer first to obtain these files.
 2. Login to the AWS Console and navigate to the Cloud Formation service.
 3. Deploy `network.yaml`
     - Click 'Create Stack' -> 'with new resources' -> 'Upload a template file' and select `network.yaml` from your computer.
-    - Click Next to get to the Parameters tab. Update the SSHLocation parameter to whitelist your home/office IP address. 
+    - Click Next to get to the Parameters tab. Update the SSHLocation parameter to whitelist your home/office IP address.
     - Click Next, Next, then Create Stack.
 4. Deploy `storage.yaml` and upload data files
     - Click 'Create Stack' -> 'with new resources' -> 'Upload a template file' and select `storage.yaml` from your computer
-    - Click Next to get to the Parameters tab. Pick a unique name for your public skepticoin bucket. This where you will publish `peers.json` and `chain.cache`
+    - Click Next to get to the Parameters tab. Pick a unique name for your public skepticoin bucket. This where you will publish `peers.json` and `chain.db`
     - Click Next, Next, then Create Stack. Click the *Outputs* tab and note down the names of the Public and Private Buckets
-    - Navigate to the AWS S3 Service. Go to the Public Bucket and upload `peers.json` and `chain.cache`
+    - Navigate to the AWS S3 Service. Go to the Public Bucket and upload `peers.json` and `chain.db`
     - Go to the Private Bucket and upload your `wallet.json`.
 5. Deploy `compute.yaml`
     - Click 'Create Stack' -> 'with new resources' -> 'Upload a template file' and select `compute.yaml` from your computer

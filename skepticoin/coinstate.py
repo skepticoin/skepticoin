@@ -1,97 +1,15 @@
 from __future__ import annotations
 
-from collections import namedtuple
 from typing import Any, List, Optional, Tuple, Callable
 
 import immutables
 
+from skepticoin.balances import PKBalance, PublicKeyBalances, uto_apply_block
+
 from .signing import PublicKey
-from .datatypes import OutputReference, Block, Output, BlockSummary, Transaction
+from .datatypes import OutputReference, Block, Output, BlockSummary
 from .humans import human
 from .genesis import genesis_block_data
-
-
-PKBalance = namedtuple('PKBalance', ['value', 'output_references'])
-
-
-def uto_apply_transaction(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output],
-    transaction: Transaction,
-    is_coinbase: bool,
-) -> immutables.Map[OutputReference, Output]:
-    with unspent_transaction_outs.mutate() as mutable_unspent_transaction_outs:
-
-        # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
-        if not is_coinbase:
-            for input in transaction.inputs:
-                # we don't explicitly check that the transaction is spendable; inadvertant violation of that expectation
-                # will lead to an application-crash (which is preferable over the alternative: double-spending).
-                del mutable_unspent_transaction_outs[input.output_reference]
-
-        for i, output in enumerate(transaction.outputs):
-            output_reference = OutputReference(transaction.hash(), i)
-            mutable_unspent_transaction_outs[output_reference] = output
-
-        return mutable_unspent_transaction_outs.finish()
-
-
-def uto_apply_block(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output], block: Block
-) -> immutables.Map[OutputReference, Output]:
-    unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, block.transactions[0], is_coinbase=True)
-    for transaction in block.transactions[1:]:
-        unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, transaction, is_coinbase=False)
-    return unspent_transaction_outs
-
-
-def pkb_apply_transaction(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output],
-    public_key_balances: immutables.Map[PublicKey, PKBalance],
-    transaction: Transaction,
-    is_coinbase: bool,
-) -> immutables.Map[PublicKey, PKBalance]:
-    with public_key_balances.mutate() as mutable_public_key_balances:
-        # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
-        if not is_coinbase:
-            for input in transaction.inputs:
-                previously_unspent_output = unspent_transaction_outs[input.output_reference]
-
-                public_key: PublicKey = previously_unspent_output.public_key
-                mutable_public_key_balances[public_key] = PKBalance(
-                    mutable_public_key_balances[public_key].value - previously_unspent_output.value,
-                    [to for to in mutable_public_key_balances[public_key].output_references
-                     if to != input.output_reference]
-                )
-
-        for i, output in enumerate(transaction.outputs):
-            output_reference = OutputReference(transaction.hash(), i)
-
-            if output.public_key not in mutable_public_key_balances:
-                mutable_public_key_balances[output.public_key] = PKBalance(0, [])
-
-            mutable_public_key_balances[output.public_key] = PKBalance(
-                mutable_public_key_balances[output.public_key].value + output.value,
-                mutable_public_key_balances[output.public_key].output_references + [output_reference],
-            )
-
-        return mutable_public_key_balances.finish()
-
-
-def pkb_apply_block(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output],
-    public_key_balances: immutables.Map[PublicKey, PKBalance],
-    block: Block,
-) -> immutables.Map[PublicKey, PKBalance]:
-    # unspent_transaction_outs is used as a "reference" only (for looking up outputs); note that we never have to update
-    # that reference inside this function, because intra-block spending is invalid per the consensus.
-
-    public_key_balances = pkb_apply_transaction(
-        unspent_transaction_outs, public_key_balances, block.transactions[0], is_coinbase=True)
-
-    for transaction in block.transactions[1:]:
-        public_key_balances = pkb_apply_transaction(unspent_transaction_outs, public_key_balances, transaction, False)
-
-    return public_key_balances
 
 
 class CoinState:
@@ -104,9 +22,6 @@ class CoinState:
         block_by_height_by_hash: immutables.Map[bytes, immutables.Map[int, Block]],
         heads: immutables.Map[bytes, Block],
         current_chain_hash: Optional[bytes],
-        public_key_balances_by_hash: immutables.Map[
-            bytes, immutables.Map[PublicKey, PKBalance]
-        ],
     ):
 
         self.block_by_hash = block_by_hash
@@ -121,7 +36,7 @@ class CoinState:
         self.current_chain_hash = current_chain_hash
 
         # block_hash -> (public_key -> (value, [OutputReference]))
-        self.public_key_balances_by_hash = public_key_balances_by_hash
+        self.public_key_balances_by_hash = PublicKeyBalances(self.block_by_hash)
 
     def dump(self, dumper: Callable[[Any], None]) -> None:
         """
@@ -130,17 +45,6 @@ class CoinState:
         DUMPER function must be passed as a parameter, to allow the calling code to control the actual file format.
         """
         dumper(self.block_by_hash)
-
-    @classmethod
-    def load(self, loader: Callable[[], Any]) -> CoinState:
-        "Faster way to load a previously dump()'d blockchain."
-        block_by_hash = loader()
-        coinstate = CoinState.zero()
-        sorted_blocks = list(block_by_hash.values())
-        sorted_blocks.sort(key=lambda block: block.height)  # type: ignore
-        for block in sorted_blocks:
-            coinstate = coinstate.add_block_no_validation(block)
-        return coinstate
 
     def __repr__(self) -> str:
         if self.current_chain_hash is None:
@@ -156,7 +60,6 @@ class CoinState:
             block_by_height_by_hash=immutables.Map(),
             heads=immutables.Map(),
             current_chain_hash=None,
-            public_key_balances_by_hash=immutables.Map(),
         )
 
     @classmethod
@@ -174,13 +77,9 @@ class CoinState:
     def add_block_no_validation(self, block: Block) -> CoinState:
         if block.previous_block_hash == b'\00' * 32:
             unspent_transaction_outs: immutables.Map[OutputReference, Output] = immutables.Map()
-            public_key_balances: immutables.Map[PublicKey, PKBalance] = immutables.Map()
         else:
             unspent_transaction_outs = self.unspent_transaction_outs_by_hash[block.previous_block_hash]
-            public_key_balances = self.public_key_balances_by_hash[block.previous_block_hash]
 
-        public_key_balances = pkb_apply_block(unspent_transaction_outs, public_key_balances, block)
-        # NOTE: ordering matters b/c we assign to unspent_transaction_outs; perhaps just distinguish?
         unspent_transaction_outs = uto_apply_block(unspent_transaction_outs, block)
 
         block_hash = block.hash()
@@ -192,9 +91,6 @@ class CoinState:
         # the current height if it is to be considered at all.
         unspent_transaction_outs_by_hash = self.unspent_transaction_outs_by_hash.set(
             block_hash, unspent_transaction_outs)
-
-        public_key_balances_by_hash = self.public_key_balances_by_hash.set(
-            block_hash, public_key_balances)
 
         if block.previous_block_hash == b'\00' * 32:
             block_by_height_by_hash: immutables.Map[bytes, immutables.Map[int, Block]]
@@ -230,7 +126,6 @@ class CoinState:
             block_by_height_by_hash=block_by_height_by_hash,
             heads=heads,
             current_chain_hash=current_chain_hash,
-            public_key_balances_by_hash=public_key_balances_by_hash,
         )
 
     def head(self) -> BlockSummary:
