@@ -246,9 +246,7 @@ class MinerWatcher:
 
         self.coinstate = self.coinstate.add_block(block, int(time()))
 
-        # Originally there was a disk write in this spot. During testing of the chain.cache changes,
-        # it was found there is a race condition between the mining thread and the networking thread.
-        # Better to skip the write here and just let the networking thread do it.
+        self.network_thread.local_peer.disk_interface.save_block(block)
 
         print(f"miner {miner_id} found block: {block_filename(block)}")
 

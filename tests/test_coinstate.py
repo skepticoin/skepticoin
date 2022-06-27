@@ -2,7 +2,7 @@ import immutables
 
 from skepticoin.signing import CoinbaseData, SECP256k1PublicKey, SECP256k1Signature
 from skepticoin.datatypes import Transaction, OutputReference, Input, Output
-from skepticoin.coinstate import uto_apply_transaction, pkb_apply_transaction, PKBalance
+from skepticoin.balances import uto_apply_transaction, pkb_apply_transaction, PKBalance
 from skepticoin.consensus import construct_reference_to_thin_air
 
 
