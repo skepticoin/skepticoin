@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import random
 from typing import Dict, List, Mapping, Set, TextIO
 
 import ecdsa
@@ -46,6 +47,9 @@ class Wallet:
         return public_key in self.keypairs
 
     def get_annotated_public_key(self, annotation: str) -> bytes:
+        if len(self.unused_public_keys) == 0:
+            print("WARNING: Re-using mining keys. Privacy may be reduced via statistical chain analysis.")
+            return random.choice(list(self.keypairs.keys()))
         public_key = self.unused_public_keys.pop()
         self.public_key_annotations[public_key] = annotation
         return public_key
