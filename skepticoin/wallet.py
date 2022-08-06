@@ -48,6 +48,9 @@ class Wallet:
 
     def get_annotated_public_key(self, annotation: str) -> bytes:
         if len(self.unused_public_keys) == 0:
+            # this if-statement was introduced to enable mining more than 10.000 blocks (which is the default wallet
+            # size) or 100.000 SKEPTI. What this says about distribution of wealth and the role (some of the) skepticoin
+            # developers see for themselves in the future of cryptocurrency is left as an excercise for the reader.
             print("WARNING: Re-using mining keys. Privacy may be reduced via statistical chain analysis.")
             return random.choice(list(self.keypairs.keys()))
         public_key = self.unused_public_keys.pop()
