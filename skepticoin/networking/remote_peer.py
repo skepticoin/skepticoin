@@ -5,6 +5,8 @@ import traceback
 from ipaddress import IPv6Address
 from typing import Dict, TYPE_CHECKING, Tuple
 
+from skepticoin.blockstore import DefaultBlockStore
+
 if TYPE_CHECKING:
     from skepticoin.networking.local_peer import LocalPeer
 
@@ -466,6 +468,7 @@ class ConnectedRemotePeer(RemotePeer):
                 return
 
             validate_block_by_itself(block, int(time()))
+            self.local_peer.disk_interface.save_block(block)
             coinstate_changed = coinstate_prior.add_block_no_validation(block)
 
             if header.in_response_to == 0 or block.height % IBD_VALIDATION_SKIP == 0:
@@ -483,10 +486,11 @@ class ConnectedRemotePeer(RemotePeer):
                     if self.local_peer.chain_manager.last_known_valid_coinstate:
                         self.local_peer.chain_manager.set_coinstate(
                             self.local_peer.chain_manager.last_known_valid_coinstate)
+                    DefaultBlockStore.instance.write_buffer.clear()  # don't save bad blocks
                     return
 
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=True)
-                self.local_peer.disk_interface.write_chain_cache_to_disk(coinstate_changed)
+                self.local_peer.disk_interface.flush_blocks()
             else:
                 self.local_peer.chain_manager.set_coinstate(coinstate_changed, validated=False)
 

@@ -126,10 +126,11 @@ class Output(Serializable):
 
 class Transaction(Serializable):
 
-    def __init__(self, inputs: List[Input], outputs: List[Output]):
+    def __init__(self, inputs: List[Input], outputs: List[Output], cached_hash: Optional[bytes] = None):
         self.version = 0  # reserved for future use; the class does not take this as a param.
         self.inputs = inputs
         self.outputs = outputs
+        self.cached_hash = cached_hash
 
     def __repr__(self) -> str:
         return "Transaction #%s" % human(self.hash())
@@ -142,12 +143,22 @@ class Transaction(Serializable):
 
     @classmethod
     def stream_deserialize(cls, f: BinaryIO) -> Transaction:
+
+        start_position = f.tell()
+
         if safe_read(f, 1) != b'\x00':
             raise ValueError("Current version supports only version 0 transactions")
 
         inputs = stream_deserialize_list(f, Input)
         outputs = stream_deserialize_list(f, Output)
-        return cls(inputs, outputs)
+
+        # speed optimization: self.serialize() is very expensive, so when loading from disk,
+        # calculate the hash directly from the original bytes before discarding them.
+        end_position = f.tell()
+        f.seek(start_position)
+        cached_hash = sha256d(f.read(end_position - start_position))
+
+        return cls(inputs, outputs, cached_hash)
 
     def stream_serialize(self, f: BinaryIO) -> None:
         f.write(struct.pack(b"B", self.version))
@@ -155,7 +166,7 @@ class Transaction(Serializable):
         stream_serialize_list(f, self.outputs)
 
     def hash(self) -> bytes:
-        return sha256d(self.serialize())
+        return self.cached_hash or sha256d(self.serialize())
 
     def __hash__(self) -> int:
         return hash(self.hash())
@@ -304,15 +315,19 @@ class BlockHeader(Serializable):
 
 
 class Block(Serializable):
-    def __init__(self, header: BlockHeader, transactions: List[Transaction]):
+    def __init__(self, header: BlockHeader, transactions: List[Transaction], hash: Optional[bytes] = None):
         self.header = header
         self.transactions = transactions
+        self.cached_hash = hash
+
+    def hash(self) -> bytes:
+        return self.cached_hash or self.header.hash()
 
     def __getattr__(self, attr: str) -> Any:
         """convenience: merge header and summary's attributes into the Block's accessors"""
         # TODO for improved mypy type-checking, this needs to be split up
 
-        if attr in ['version', 'summary', 'pow_evidence', 'hash']:
+        if attr in ['version', 'summary', 'pow_evidence']:
             return getattr(self.header, attr)
 
         if attr in ['height', 'previous_block_hash', 'merkle_root_hash', 'timestamp', 'target', 'nonce']:
@@ -333,9 +348,13 @@ class Block(Serializable):
 
     @classmethod
     def stream_deserialize(cls, f: BinaryIO) -> Block:
+        start_position = f.tell()
         header = BlockHeader.stream_deserialize(f)
+        end_position = f.tell()
+        f.seek(start_position)
+        hash = sha256d(f.read(end_position - start_position))
         transactions = stream_deserialize_list(f, Transaction)
-        return cls(header, transactions)
+        return cls(header, transactions, hash)
 
     def stream_serialize(self, f: BinaryIO) -> None:
         self.header.stream_serialize(f)
