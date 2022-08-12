@@ -158,7 +158,7 @@ class BlockStore:
 
     def flush_blocks_to_disk(self) -> None:
         with self.lock:
-            if(len(self.write_buffer)):
+            if (len(self.write_buffer)):
                 self.write_blocks_to_disk(self.write_buffer)
                 self.write_buffer.clear()
 
