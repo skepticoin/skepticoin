@@ -8,7 +8,14 @@ share
 dist
 skepticoin/scmversion.py
 __pycache__
-**/wallet.json 
-**/peers.json 
-**/chain/ 
+**/wallet.json
+**/peers.json
+**/chain/
 **/chain.cache
+sqlite-autoconf-*
+env*/
+test.db
+test.tmp
+chain.db*
+chain.zip
+.vscode/

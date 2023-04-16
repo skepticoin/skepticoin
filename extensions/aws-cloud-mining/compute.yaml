@@ -72,6 +72,10 @@ Resources:
               Resource: '*'
             - Effect: Allow
               Action:
+              - ec2:DescribeInstances
+              Resource: '*'
+            - Effect: Allow
+              Action:
               - s3:*
               Resource: '*'
               # !ImportValue "PrivateWalletBucket"
@@ -113,7 +117,6 @@ Resources:
           - logs
           - swap
           - workload
-          - crontab
         logs: # send logs to CloudWatch
           files:
             "/etc/cloudwatch-config.json":
@@ -198,19 +201,24 @@ Resources:
                 python3.8 setup.py install
 
                 # prepare skepticoin run-time environment
-                mkdir -p /tmp/skepticoin
-                cd /tmp/skepticoin
+                mkdir -p /home/ec2-user/runtime
+                cd /home/ec2-user/runtime
                 aws s3 cp s3://$PRIVATE_BUCKET/wallet.json .
-                aws s3 cp s3://$PUBLIC_BUCKET/peers.json .
                 aws s3 cp s3://$PUBLIC_BUCKET/chain.db .
 
-                # perform a balance operation first, to update the chain.db and peers.json
-                PYTHONUNBUFFERED=1 skepticoin-balance >> $LOG 2>&1
-                aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.db
+                # Publish IP addresses back into peers.json
+                aws ec2 describe-instances --region ${AWS::Region} --filters "Name=tag:Name,Values=skepticoin-miner" "Name=instance-state-name,Values=running" --query 'Reservations[].Instances[].[PublicIpAddress]' --output json | python -c "import sys, json; print(json.dumps([[row[0], 2412, 'OUTGOING'] for row in json.load(sys.stdin)]))" | aws s3 cp --content-type application/json --acl public-read - s3://$PUBLIC_BUCKET/peers.json
+
+                # Set things up to start skepticoin-mine on reboot. Reboot daily, publish chain.db.
+                crontab <<EOF
+                @reboot . /home/ec2-user/venv/bin/activate && cd /home/ec2-user/runtime && PYTHONUNBUFFERED=1 skepticoin-mine ${SkepticoinMiningParams} >> $LOG 2>&1; sleep 1800 && /sbin/reboot
+                0 0 * * * echo 'killall skepticoin-mine; sleep 30; cd /home/ec2-user/runtime && aws s3 sync . s3://$PUBLIC_BUCKET/ --exclude "*" --include chain.db; /sbin/reboot' | at "\$(shuf -i 0-23 -n 1):\$(shuf -i 0-59 -n 1)"
+                EOF
 
                 # start mining
-                PYTHONUNBUFFERED=1 nohup skepticoin-mine ${SkepticoinMiningParams} >> $LOG 2>&1 &
-                echo "miner starting"
+                echo "rebooting to start miner"
+                /sbin/reboot
+
               owner: ec2-user
               group: ec2-user
               mode: "000755"
@@ -220,22 +228,6 @@ Resources:
                 PRIVATE_BUCKET: !ImportValue "PrivateWalletBucket"
                 PUBLIC_BUCKET: !ImportValue "PublicBucket"
               command: /home/ec2-user/workload
-        crontab:
-          files:
-            "/tmp/crontab":
-              # Crontab contents explanation:
-              # - Every 15 minutes check to see if skepticoin-mine is still listening on port 2412. When it's not, it's assumed to have crashed, and the node is taken out.
-              # - Every hour, copy the up-to-date local peers.json back into the public S3 bucket. It'll be overwritten by each node, which is inefficient but fine.
-              content: !Sub
-                - |
-                  */15 * * * * sleep 900; nc -zv 127.0.0.1 2412 || aws autoscaling set-instance-health --region ${AWS::Region} --instance-id $(curl -s http://169.254.169.254/latest/meta-data/instance-id) --health-status Unhealthy
-                  0 * * * * cd /tmp/skepticoin && aws s3 cp peers.json s3://${PUBLIC_BUCKET}/
-                - PUBLIC_BUCKET: !ImportValue "PublicBucket"
-          commands:
-            01_install:
-              command: "yum install -y nc"
-            02_crontab:
-              command: "crontab /tmp/crontab"
 
     Properties:
       AssociatePublicIpAddress: true
