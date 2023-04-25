@@ -69,8 +69,17 @@ class LocalPeer:
         conn.setblocking(False)
         events = selectors.EVENT_READ
 
-        remote_host = conn.getpeername()[0]
-        remote_port = conn.getpeername()[1]
+        try:
+            remote_host = conn.getpeername()[0]
+            remote_port = conn.getpeername()[1]
+        except OSError as e:
+            if e.errno == 107:
+                self.logger.error("getpeername(): Transport endpoint is not connected")
+                conn.close()
+                return
+            else:
+                raise
+
         remote_peer = ConnectedRemotePeer(self, remote_host, remote_port, INCOMING, None, conn, ban_score=0)
         self.selector.register(conn, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
