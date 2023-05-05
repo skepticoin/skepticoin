@@ -25,7 +25,7 @@ class EverythingIsNone:
 
 
 def main() -> None:
-    config_file, history_file = get_config_and_history_file(EverythingIsNone())
+    config_file, history_file = get_config_and_history_file(EverythingIsNone())  # type: ignore
 
     parser = DefaultArgumentParser()
     parser.add_argument("--vi-mode", help="Vi mode", action="store_true")

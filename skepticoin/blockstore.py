@@ -205,29 +205,30 @@ class BlockStore:
             (height, previous_block_hash, merkle_root_hash, timestamp, target, nonce,
              pow_summary_hash, pow_chain_sample, pow_block_hash, block_hash) = row
 
-            yield Block(
-                    BlockHeader(
-                        BlockSummary(
-                            height=height,
-                            previous_block_hash=zeroify_nulls(previous_block_hash),
-                            merkle_root_hash=merkle_root_hash,
-                            timestamp=timestamp,
-                            target=target,
-                            nonce=nonce
+            if block_hash in block_builders:
+                yield Block(
+                        BlockHeader(
+                            BlockSummary(
+                                height=height,
+                                previous_block_hash=zeroify_nulls(previous_block_hash),
+                                merkle_root_hash=merkle_root_hash,
+                                timestamp=timestamp,
+                                target=target,
+                                nonce=nonce
+                            ),
+                            PowEvidence(
+                                summary_hash=pow_summary_hash,
+                                chain_sample=pow_chain_sample,
+                                block_hash=pow_block_hash
+                            )
                         ),
-                        PowEvidence(
-                            summary_hash=pow_summary_hash,
-                            chain_sample=pow_chain_sample,
-                            block_hash=pow_block_hash
-                        )
-                    ),
-                    [Transaction(
-                        [v for k, v in sorted(builder.inputs.items(), key=lambda i: i[0])],
-                        [v for k, v in sorted(builder.outputs.items(), key=lambda i: i[0])],
-                        transaction_hash
-                    ) for transaction_hash, builder in block_builders[block_hash]],
-                    hash=block_hash
-            )
+                        [Transaction(
+                            [v for k, v in sorted(builder.inputs.items(), key=lambda i: i[0])],
+                            [v for k, v in sorted(builder.outputs.items(), key=lambda i: i[0])],
+                            transaction_hash
+                        ) for transaction_hash, builder in block_builders[block_hash]],
+                        hash=block_hash
+                )
 
 
 class DefaultBlockStore:

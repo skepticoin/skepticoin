@@ -42,7 +42,7 @@ def main() -> None:
     try:
         # we need a fresh chain because our wallet doesn't track spending/receiving, so we need to look at the real
         # blockchain to know what we can spend.
-        wait_for_fresh_chain(thread)
+        wait_for_fresh_chain(thread, freshness=300)
         print("Chain up to date")
 
         target_address = SECP256k1PublicKey(parse_address(args.address))

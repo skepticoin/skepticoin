@@ -28,7 +28,7 @@ def check_chain_dir() -> None:
         print('Your ./chain/ directory is no longer needed: please delete it to stop this reminder.')
 
 
-def wait_for_fresh_chain(thread: NetworkingThread, freshness: int = 10*24*60*60) -> None:
+def wait_for_fresh_chain(thread: NetworkingThread, freshness: int) -> None:
     """
     Wait until your chain is no more than specified seconds old before you start mining yourself
     """
@@ -45,8 +45,8 @@ def read_chain_from_disk() -> CoinState:
     for block in DefaultBlockStore.instance.read_blocks_from_disk():
         try:
             coinstate = coinstate.add_block_no_validation(block)
-        except Exception as e:
-            raise Exception(e, f' @ block_hash={human(block.hash())}, height={block.height}')
+        except Exception:
+            print(f'Skipping block_hash={human(block.hash())} @ height={block.height}')
 
     # It is no longer possible to load old files, due to pickle issues not worth solving.
 

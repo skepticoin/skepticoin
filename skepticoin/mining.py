@@ -83,6 +83,8 @@ class MinerWatcher:
         parser = DefaultArgumentParser()
         parser.add_argument('-n', default=1, type=int, help='number of miner instances')
         parser.add_argument('--quiet', action='store_true', help='do not print stats to the console every second')
+        parser.add_argument('--freshness', default=10*24*60*60, type=int,
+                            help='maximum age of chain, in seconds, before waiting for chain')
         self.args = parser.parse_args()
 
         self.recv_queue: Queue = Queue()
@@ -114,7 +116,7 @@ class MinerWatcher:
 
         self.network_thread.local_peer.show_stats()
 
-        wait_for_fresh_chain(self.network_thread)
+        wait_for_fresh_chain(self.network_thread, freshness=self.args.freshness)
         self.network_thread.local_peer.show_stats()
 
         if self.network_thread.local_peer.chain_manager.coinstate.head().height <= MAX_KNOWN_HASH_HEIGHT:
@@ -258,6 +260,7 @@ class MinerWatcher:
         self.coinstate = self.coinstate.add_block(block, int(time()))
 
         self.network_thread.local_peer.disk_interface.save_block(block)
+        self.network_thread.local_peer.disk_interface.flush_blocks()
 
         print(f"miner {miner_id} found block: {block_filename(block)}")
 
