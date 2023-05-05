@@ -467,7 +467,14 @@ class ConnectedRemotePeer(RemotePeer):
                                                human(block_hash)))
                 return
 
-            validate_block_by_itself(block, int(time()))
+            try:
+                validate_block_by_itself(block, int(time()))
+            except Exception as e:
+                self.local_peer.logger.info(
+                    "%15s at height=%d, block received is invalid: %s, error = %s" % (
+                        self.host, coinstate_prior.head().height, human(block_hash), str(e)))
+                return
+
             self.local_peer.disk_interface.save_block(block)
             coinstate_changed = coinstate_prior.add_block_no_validation(block)
 
