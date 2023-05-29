@@ -22,7 +22,6 @@ from skepticoin.cheating import MAX_KNOWN_HASH_HEIGHT
 from time import time
 from multiprocessing import Process, Queue
 from skepticoin.scripts.utils import (
-    check_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
@@ -107,7 +106,6 @@ class MinerWatcher:
     def __call__(self) -> None:
         configure_logging_from_args(self.args)
 
-        check_chain_dir()
         self.coinstate = read_chain_from_disk()
 
         self.wallet = open_or_init_wallet()
@@ -115,8 +113,6 @@ class MinerWatcher:
         self.balance = self.start_balance
 
         self.network_thread = start_networking_peer_in_background(self.args, self.coinstate)
-
-        self.network_thread.local_peer.show_stats()
 
         wait_for_fresh_chain(self.network_thread, freshness=self.args.freshness)
         self.network_thread.local_peer.show_stats()

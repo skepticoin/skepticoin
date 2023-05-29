@@ -1,10 +1,10 @@
 from copy import deepcopy
 import immutables
 import pytest
-from pathlib import Path
 
 from skepticoin.humans import computer
 from skepticoin.params import (
+    BLOCKS_BETWEEN_TARGET_READJUSTMENT,
     DESIRED_TARGET_READJUSTMENT_TIMESPAN,
     INITIAL_TARGET,
     MAX_COINBASE_RANDOM_DATA_SIZE,
@@ -12,6 +12,7 @@ from skepticoin.params import (
 )
 from skepticoin.coinstate import CoinState
 from skepticoin.consensus import (
+    calc_target,
     calculate_new_target,
     construct_block_for_mining,
     construct_block_for_mining_genesis,
@@ -21,6 +22,7 @@ from skepticoin.consensus import (
     construct_pow_evidence,
     get_block_subsidy,
     get_transaction_fee,
+    validate_coinbase_transaction_in_coinstate,
     validate_non_coinbase_transaction_by_itself,
     validate_coinbase_transaction_by_itself,
     validate_block_header_by_itself,
@@ -35,24 +37,9 @@ from skepticoin.consensus import (
 from skepticoin.signing import SECP256k1PublicKey, SECP256k1Signature, SignableEquivalent
 from skepticoin.datatypes import Transaction, OutputReference, Input, Output, Block, BlockHeader
 
-
-CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("testdata/chain")
+from tests.test_db import read_test_chain_from_disk
 
 example_public_key = SECP256k1PublicKey(b'x' * 64)
-
-
-def _read_chain_from_disk(max_height):
-    coinstate = CoinState.zero()
-
-    for file_path in sorted(CHAIN_TESTDATA_PATH.iterdir()):
-        height = int(file_path.name.split("-")[0])
-        if height > max_height:
-            return coinstate
-
-        block = Block.stream_deserialize(open(file_path, 'rb'))
-        coinstate = coinstate.add_block_no_validation(block)
-
-    return coinstate
 
 
 def get_example_genesis_block():
@@ -72,6 +59,16 @@ def test_calculate_new_target():
 
     assert calculate_new_target(INITIAL_TARGET, DESIRED_TARGET_READJUSTMENT_TIMESPAN * 2)[:4] == b'\x02\x00\x00\x00'
     assert calculate_new_target(INITIAL_TARGET, DESIRED_TARGET_READJUSTMENT_TIMESPAN // 2)[:4] == b'\x00\x80\x00\x00'
+
+    # also test the rarely executed code path that calls calculate_new_target()
+    coinstate = read_test_chain_from_disk(5)
+    fake_height = BLOCKS_BETWEEN_TARGET_READJUSTMENT
+    fake_future = coinstate.head().timestamp + DESIRED_TARGET_READJUSTMENT_TIMESPAN
+    target = calc_target(coinstate, fake_height, fake_future, coinstate.head_block)
+    assert target.hex().startswith('017f')
+
+    target2 = calc_target(coinstate, fake_height + 1, fake_future, coinstate.head_block)
+    assert target2 == coinstate.head().target
 
 
 def test_construct_minable_summary():
@@ -99,10 +96,10 @@ def test_construct_pow_evidence_genesis_block():
 
 
 def test_construct_pow_evidence_non_genesis_block():
-    coinstate = _read_chain_from_disk(5)
+    coinstate = read_test_chain_from_disk(5)
 
     transactions = [
-        construct_coinbase_transaction(0, [], immutables.Map(), b"Political statement goes here", example_public_key),
+        construct_coinbase_transaction(0, [], CoinState.empty(), b"Political statement goes here", example_public_key),
     ]
 
     summary = construct_minable_summary(coinstate, transactions, 1231006505, 0)
@@ -113,7 +110,7 @@ def test_construct_pow_evidence_non_genesis_block():
 
 
 def test_construct_block_for_mining_no_non_coinbase_transactions():
-    coinstate = _read_chain_from_disk(5)
+    coinstate = read_test_chain_from_disk(5)
 
     block = construct_block_for_mining(
         coinstate, [], example_public_key, 1231006505, b'skepticoin is digital bitcoin', 1234)
@@ -127,7 +124,7 @@ def test_construct_block_for_mining_no_non_coinbase_transactions():
 
 
 def test_construct_block_for_mining_with_non_coinbase_transactions():
-    coinstate = _read_chain_from_disk(5)
+    coinstate = read_test_chain_from_disk(5)
 
     transactions = [Transaction(
         inputs=[Input(
@@ -437,6 +434,15 @@ def test_validate_non_coinbase_transaction_in_coinstate_invalid_output_reference
         validate_non_coinbase_transaction_in_coinstate
 
     '''
+
+
+def test_validate_coinbase_transaction_in_coinstate():
+    coinstate = read_test_chain_from_disk(5)
+    validate_coinbase_transaction_in_coinstate(
+        coinstate.head_block.transactions[0],
+        coinstate.head_block,
+        coinstate
+    )
 
 
 def test_validate_non_coinbase_transaction_in_coinstate_invalid_signature():

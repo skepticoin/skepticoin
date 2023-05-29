@@ -24,11 +24,6 @@ class DefaultArgumentParser(argparse.ArgumentParser):
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
 
 
-def check_chain_dir() -> None:
-    if os.path.exists('chain'):
-        print('Your ./chain/ directory is no longer needed: please delete it to stop this reminder.')
-
-
 def wait_for_fresh_chain(thread: NetworkingThread, freshness: int) -> None:
     """
     Wait until your chain is no more than specified seconds old before you start mining yourself
@@ -59,10 +54,11 @@ def open_or_init_wallet() -> Wallet:
     if os.path.isfile("wallet.json"):
         wallet = Wallet.load(open("wallet.json", "r"))
     else:
+        print("Creating new wallet...")
         wallet = Wallet.empty()
         wallet.generate_keys(10_000)
         save_wallet(wallet)
-        print("Created new wallet w/ 10.000 keys")
+        print(f"Created new wallet w/ {len(wallet.keypairs)} keys")
 
     return wallet
 

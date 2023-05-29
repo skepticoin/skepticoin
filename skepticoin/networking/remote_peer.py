@@ -1,7 +1,6 @@
 from __future__ import annotations
 from io import BytesIO
 import logging
-import traceback
 
 from ipaddress import IPv6Address
 from typing import Dict, TYPE_CHECKING, Tuple
@@ -260,9 +259,10 @@ class ConnectedRemotePeer(RemotePeer):
     def start_sending(self) -> None:
         try:
             self.local_peer.selector.modify(self.sock, selectors.EVENT_READ | selectors.EVENT_WRITE, data=self)
-        except ValueError:
-            self.local_peer.logger.error("%15s ConnectedRemotePeer.start_sending() ValueError: %s\n"
-                                         % (self.host, traceback.format_exc()))
+        except Exception as e:
+            self.local_peer.logger.info(
+                "%15s ConnectedRemotePeer.start_sending() Error: %s\n" % (self.host, str(e)))
+            self.local_peer.disconnect(self, e)
 
     def stop_sending(self) -> None:
         self.local_peer.selector.modify(self.sock, selectors.EVENT_READ, data=self)
@@ -320,7 +320,7 @@ class ConnectedRemotePeer(RemotePeer):
                 return
 
     def handle_receive_data(self, data: bytes) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data(%d)" % (self.host, len(data)))
+        self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_receive_data(%d)" % (self.host, len(data)))
         self.receiver.receive(data)
 
     def handle_hello_message_received(
@@ -355,10 +355,22 @@ class ConnectedRemotePeer(RemotePeer):
             self.connection_to_self = True
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
 
         coinstate = self.local_peer.chain_manager.coinstate
-        self.local_peer.logger.debug("%15s ... at coinstate %s" % (self.host, coinstate))
+
+        if self.local_peer.logger.isEnabledFor(logging.INFO):
+            def hash_to_height(h: bytes) -> str:
+                try:
+                    return str(coinstate.get_block_by_hash(h).height)
+                except KeyError:
+                    return "Unknown:" + human(h)
+            self.local_peer.logger.info(
+                "%15s ConnectedRemotePeer.handle_get_blocks_message_received(heights=[%s]) ... at coinstate %s" % (
+                    self.host, " ".join([hash_to_height(h) for h in message.potential_start_hashes]),
+                    coinstate
+                )
+            )
+
         for potential_start_hash in message.potential_start_hashes:
             self.local_peer.logger.debug("%15s ... psh %s" % (self.host, human(potential_start_hash)))
             if coinstate.has_block_hash(potential_start_hash):
@@ -479,14 +491,19 @@ class ConnectedRemotePeer(RemotePeer):
     def handle_get_data_message_received(
         self, header: MessageHeader, get_data_message: GetDataMessage
     ) -> None:
+
         if get_data_message.data_type != DATA_BLOCK:
             raise NotImplementedError("We can only deal w/ DATA_BLOCK GetDataMessage objects for now")
+
+        self.local_peer.logger.info(
+            "%15s ConnectedRemotePeer.handle_get_data_message_received(hash=%s)" % (
+                self.host, human(get_data_message.hash)))
 
         coinstate = self.local_peer.chain_manager.coinstate
 
         if not coinstate.has_block_hash(get_data_message.hash):
             # we simply silently ignore GetDataMessage for hashes we don't have... future work: inc banscore, or ...
-            self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_data_message_received for unknown hash %s" % (
+            self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_data_message_received for unknown hash %s" % (
                 self.host, human(get_data_message.hash)))
             return
 
@@ -495,13 +512,11 @@ class ConnectedRemotePeer(RemotePeer):
 
         data_message = DataMessage(DATA_BLOCK, block)
 
-        self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_data_message_received for hash %s h. %s" % (
-            self.host, human(get_data_message.hash), coinstate.get_block_by_hash(get_data_message.hash).height))
         self.send_message(data_message, prev_header=header)
         self.height_sent = block.height
 
     def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
-        self.local_peer.logger.info(
+        self.local_peer.logger.debug(
             "%15s ConnectedRemotePeer.handle_data_message_received(type=%s format=%s)" % (
              self.host, str(DATATYPES[message.data_type]), header.format()))
 
@@ -516,7 +531,6 @@ class ConnectedRemotePeer(RemotePeer):
     def handle_block_received(
         self, header: MessageHeader, message: DataMessage
     ) -> None:
-
         block: Block = message.data  # type: ignore
 
         self.local_peer.logger.debug(

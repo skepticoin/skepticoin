@@ -87,7 +87,7 @@ class NetworkManager(Manager):
         self._sanity_check()
 
     def handle_peer_disconnected(self, remote_peer: ConnectedRemotePeer) -> None:
-        self.local_peer.logger.info("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
+        self.local_peer.logger.debug("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
 
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
 

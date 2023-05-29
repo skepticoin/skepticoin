@@ -336,7 +336,7 @@ class Block(Serializable):
         raise AttributeError("'Block' object has no attribute '%s'" % attr)
 
     def __repr__(self) -> str:
-        return "Block #%s" % human(self.header.hash())
+        return "Block #%d-%s" % (self.height, human(self.hash()))
 
     def __eq__(self, other: Any) -> bool:
         return (

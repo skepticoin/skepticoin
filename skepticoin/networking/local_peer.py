@@ -84,6 +84,7 @@ class LocalPeer:
         remote_peer = ConnectedRemotePeer(self, remote_host, remote_port, INCOMING, None, conn, ban_score=0)
         self.selector.register(conn, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
+        self.show_stats()
 
     def handle_remote_peer_selector_event(
         self, key: selectors.SelectorKey, mask: int
@@ -100,7 +101,8 @@ class LocalPeer:
                 if recv_data:
                     remote_peer.handle_receive_data(recv_data)
                 else:
-                    self.disconnect(remote_peer, "connection closed remotely")  # is this so?
+                    self.disconnect(remote_peer,
+                                    Exception("connection closed remotely"))  # is this so?
 
             if mask & selectors.EVENT_WRITE:
                 remote_peer.handle_can_send(sock)
@@ -112,7 +114,7 @@ class LocalPeer:
         except Exception as e:
             # We take the position that any exception caused is reason to disconnect. This allows the code that talks to
             # peers to not have special cases for exceptions since they will all be caught by this catch-all.
-            self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
+            self.logger.debug("%15s Disconnecting remote peer, reason: %s" % (remote_peer.host, e))
 
             if "ValueError: Invalid file descriptor: " not in str(e):
                 self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
@@ -126,12 +128,17 @@ class LocalPeer:
             self.selector.unregister(remote_peer.sock)
             remote_peer.sock.close()
 
-        except Exception:
+        except Exception as error:
             # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
             # (i.e. the whole business of unregistering things that are already in some half-baked state).
             # One path how you might end up here: a EVENT_WRITE is reached for a socket that was just closed
             # as a consequence of something that was read.
-            self.logger.info("%15s Error while disconnecting %s" % ("", traceback.format_exc()))
+            self.logger.info("%15s Error while disconnecting %s" % ("", str(error)))
+
+        try:
+            self.network_manager.handle_peer_disconnected(remote_peer)
+        except Exception:
+            self.logger.info("%15s Error while handling peer disconnected %s" % ("", traceback.format_exc()))
 
     def start_outgoing_connection(self, disconnected_peer: DisconnectedRemotePeer) -> None:
 
@@ -154,6 +161,7 @@ class LocalPeer:
         remote_peer = disconnected_peer.as_connected(self, sock)
         self.selector.register(sock, events, data=remote_peer)
         self.network_manager.handle_peer_connected(remote_peer)
+        self.show_stats()
 
     def step_managers(self, current_time: int) -> None:
         for manager in self.managers:
@@ -191,7 +199,7 @@ class LocalPeer:
             self.logger.info("%15s LocalPeer selector closed" % "")
 
     def stop(self) -> None:
-        self.logger.info("%15s LocalPeer.stop()" % "")
+        self.logger.info("%15s LocalPeer.stop() at:\n%s" % ("", traceback.format_stack()))
         self.running = False
 
     def show_stats(self) -> None:
@@ -223,13 +231,13 @@ class LocalPeer:
             out += heading
             heading = "        "
             out += "Height = %s, " % head.height
-            out += "Date/time = %s\n" % datetime.fromtimestamp(head.timestamp).isoformat()
+            out += "%s" % datetime.fromtimestamp(head.timestamp).isoformat()
             if head.height != lca.height:
-                out += "  diverges for %s blocks\n" % (head.height - lca.height)
+                out += ", diverges for %s blocks\n" % (head.height - lca.height)
             out += "\n"
 
         if out != self.last_stats_output:
-            print(out)
+            print(datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + out)
             self.last_stats_output = out
 
     def show_network_stats(self) -> None:

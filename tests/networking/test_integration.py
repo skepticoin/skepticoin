@@ -7,18 +7,17 @@ from typing import Dict, Tuple
 import pytest
 from time import time
 import logging
-from pathlib import Path
 from time import sleep
 import socket
 
 from skepticoin.signing import SignableEquivalent, SECP256k1PublicKey
-from skepticoin.datatypes import Block, Transaction, Input, Output, OutputReference
+from skepticoin.datatypes import Transaction, Input, Output, OutputReference
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.messages import InventoryMessage
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.networking.remote_peer import DisconnectedRemotePeer, RemotePeer, load_peers_from_list
 
-CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("../testdata/chain")
+from tests.test_db import read_test_chain_from_disk, setup_test_db
 
 
 class FakeDiskInterface:
@@ -35,20 +34,6 @@ class FakeDiskInterface:
         pass
 
 
-def _read_chain_from_disk(max_height):
-    coinstate = CoinState.zero()
-
-    for file_path in sorted(CHAIN_TESTDATA_PATH.iterdir()):
-        height = int(file_path.name.split("-")[0])
-        if height > max_height:
-            return coinstate
-
-        block = Block.stream_deserialize(open(file_path, 'rb'))
-        coinstate = coinstate.add_block_no_validation(block)
-
-    return coinstate
-
-
 def _try_to_connect(host, port):
     # just a blocking connect to check that a server is up and listening, then close the connection.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -61,15 +46,17 @@ def test_ibd_integration(caplog):
 
     caplog.set_level(logging.INFO)
 
-    coinstate = _read_chain_from_disk(5)
-    assert coinstate.head().height == 5
+    coinstate1 = read_test_chain_from_disk(5, "ibd1")
+    assert coinstate1.head().height == 5
 
-    thread_a = NetworkingThread(coinstate, 12412, FakeDiskInterface())
+    coinstate2 = CoinState(setup_test_db("ibd2"))
+
+    thread_a = NetworkingThread(coinstate1, 12412, FakeDiskInterface())
     thread_a.start()
 
     _try_to_connect('127.0.0.1', 12412)
 
-    thread_b = NetworkingThread(CoinState.zero(), 12413, FakeDiskInterface())
+    thread_b = NetworkingThread(coinstate2, 12413, FakeDiskInterface())
     thread_b.local_peer.network_manager.disconnected_peers = load_peers_from_list([('127.0.0.1', 12412, "OUTGOING")])
     thread_b.start()
 
@@ -102,18 +89,19 @@ def test_broadcast_transaction(caplog, mocker):
 
     caplog.set_level(logging.INFO)
 
-    coinstate = _read_chain_from_disk(5)
+    coinstate1 = read_test_chain_from_disk(5, "int1")
+    coinstate2 = read_test_chain_from_disk(5, "int2")
 
-    thread_a = NetworkingThread(coinstate, 12412, FakeDiskInterface())
+    thread_a = NetworkingThread(coinstate1, 12412, FakeDiskInterface())
     thread_a.start()
 
     _try_to_connect('127.0.0.1', 12412)
 
-    thread_b = NetworkingThread(coinstate, 12413, FakeDiskInterface())
+    thread_b = NetworkingThread(coinstate2, 12413, FakeDiskInterface())
     thread_b.local_peer.network_manager.disconnected_peers = load_peers_from_list([('127.0.0.1', 12412, "OUTGOING")])
     thread_b.start()
 
-    previous_hash = coinstate.at_head.block_by_height[0].transactions[0].hash()
+    previous_hash = coinstate1.block_by_height_at_head(0).transactions[0].hash()
 
     # Not actually a valid transaction (not signed)
     transaction = Transaction(
@@ -162,7 +150,7 @@ def test_broadcast_transaction(caplog, mocker):
 def test_broadcast_message_closed_connection_handling(caplog, mocker):
     caplog.set_level(logging.INFO)
 
-    coinstate = _read_chain_from_disk(5)
+    coinstate = read_test_chain_from_disk(5)
 
     thread_a = NetworkingThread(coinstate, 12412, FakeDiskInterface())
     thread_a.start()

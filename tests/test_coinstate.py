@@ -168,3 +168,23 @@ def test_pkb_apply_transaction_on_non_coinbase_transaction():
 
     assert result[public_key_2].value == 30  # the value of the transaction output
     assert result[public_key_2].output_references == [OutputReference(transaction.hash(), 0)]
+
+
+def test_deferred_validation():
+    coinstate = read_test_chain_from_disk(5)
+    validation_coinstate = coinstate.checkout(coinstate.block_by_height_at_head(3).hash())
+    validate_block_in_coinstate(coinstate.block_by_height_at_head(4), validation_coinstate)
+
+
+def test_get_hashes_at_heights():
+    coinstate = read_test_chain_from_disk(5)
+
+    hashes = coinstate.get_block_hashes_at_heights([2, 5])
+    assert len(hashes) == 2
+    assert hashes[0] == coinstate.block_by_height_at_head(2).hash()
+    assert hashes[1] == coinstate.block_by_height_at_head(5).hash()
+
+    hashes = coinstate.get_block_hashes_at_heights([4, 1])
+    assert len(hashes) == 2
+    assert hashes[0] == coinstate.block_by_height_at_head(4).hash()
+    assert hashes[1] == coinstate.block_by_height_at_head(1).hash()
