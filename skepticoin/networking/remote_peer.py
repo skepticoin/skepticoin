@@ -1,5 +1,6 @@
 from __future__ import annotations
 from io import BytesIO
+import logging
 import traceback
 
 from ipaddress import IPv6Address
@@ -175,6 +176,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer = local_peer
         self.sock = sock
         self.direction = direction
+        self.connection_to_self = False
 
         self.receiver = MessageReceiver(self)
         self.send_backlog: List[bytes] = []
@@ -184,13 +186,19 @@ class ConnectedRemotePeer(RemotePeer):
         self.hello_received: bool = False
 
         self.waiting_for_inventory: bool = False
-        self.last_empty_inventory_response_at: int = 0
+        self.last_inventory_response_at: int = 0
+        self.last_inventory_request_at: int = 0
         self.inventory_messages: List[InventoryMessageState] = []
         self.block_receive_buffer: List[Block] = []
 
         self._next_msg_id: int = 0
         self.last_get_peers_sent_at: Optional[int] = None
         self.waiting_for_peers: bool = False
+
+        # informational trackers
+        self.height_sent = 0
+        self.height_received = 0
+        self.last_message_received_at = 0
 
     def as_disconnected(self) -> DisconnectedRemotePeer:
         return DisconnectedRemotePeer(self.host, self.port, self.direction,
@@ -214,6 +222,9 @@ class ConnectedRemotePeer(RemotePeer):
             self.send_message(hello_message)
 
         if not self.hello_received:
+            return
+
+        if self.connection_to_self:
             return
 
         if ((self.last_get_peers_sent_at is None or current_time > self.last_get_peers_sent_at + GET_PEERS_INTERVAL)
@@ -244,9 +255,7 @@ class ConnectedRemotePeer(RemotePeer):
 
         self.send_backlog.append((MAGIC + struct.pack(b">I", len(data)) + data))
 
-        if len(self.send_buffer) == 0:
-            self.send_buffer = self.send_backlog.pop(0)
-            self.start_sending()
+        self.start_sending()
 
     def start_sending(self) -> None:
         try:
@@ -261,6 +270,8 @@ class ConnectedRemotePeer(RemotePeer):
     def handle_message_received(self, header: MessageHeader, message: Message) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_message_received(%s %s)" % (
             self.host, type(message).__name__, header.format()))
+
+        self.last_message_received_at = int(time())
 
         if isinstance(message, HelloMessage):
             return self.handle_hello_message_received(header, message)
@@ -289,18 +300,24 @@ class ConnectedRemotePeer(RemotePeer):
         raise NotImplementedError("%s" % message)
 
     def handle_can_send(self, sock: socket.socket) -> None:
-        self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)"
-                                    % (self.host, len(self.send_buffer), len(self.send_backlog)))
+        self.local_peer.logger.debug(
+            "%15s ConnectedRemotePeer.handle_can_send(buffer=%d, backlog=%d)" % (
+                self.host, len(self.send_buffer), len(self.send_backlog)))
 
-        sent = sock.send(self.send_buffer)
-        self.send_buffer = self.send_buffer[sent:]
+        while True:
+            if len(self.send_buffer) == 0:
+                if len(self.send_backlog) == 0:
+                    self.stop_sending()
+                    return
+                else:
+                    self.send_buffer = self.send_backlog.pop(0)
 
-        if len(self.send_buffer) == 0:
-            if len(self.send_backlog) == 0:
-                self.stop_sending()
-            else:
-                self.send_buffer = self.send_backlog.pop(0)
-                self.handle_can_send(sock)
+            try:
+                sent = sock.send(self.send_buffer)
+                self.send_buffer = self.send_buffer[sent:]
+            except BlockingIOError as e:
+                self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_can_send(): %s" % (self.host, str(e)))
+                return
 
     def handle_receive_data(self, data: bytes) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_receive_data(%d)" % (self.host, len(data)))
@@ -333,9 +350,9 @@ class ConnectedRemotePeer(RemotePeer):
         if self.direction == OUTGOING:
             self.local_peer.disk_interface.write_peers(self)
 
-        if self.direction == OUTGOING and message.nonce == self.local_peer.nonce:
+        if message.nonce == self.local_peer.nonce:
             self.local_peer.network_manager.my_addresses.add((self.host, self.port))
-            self.local_peer.disconnect(self, "connection to self")
+            self.connection_to_self = True
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
@@ -352,6 +369,7 @@ class ConnectedRemotePeer(RemotePeer):
                     # we have no new info
                     self.local_peer.logger.debug("%15s ... no new info" % self.host)
                     self.send_message(InventoryMessage([]), prev_header=header)
+                    self.height_sent = coinstate.head().height
                     return
 
                 if coinstate.block_by_height_at_head(start_height).previous_block_hash == potential_start_hash:
@@ -370,15 +388,25 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.logger.info("%15s ... returning inventory from start_height=%d, %d items"
                                     % (self.host, start_height, len(items)))
         self.send_message(InventoryMessage(items), prev_header=header)
+        self.height_sent = end_height
 
     def handle_inventory_message_received(
         self, header: MessageHeader, message: InventoryMessage
     ) -> None:
         self.local_peer.logger.info(
-            "%15s ConnectedRemotePeer.handle_inventory_message_received(%d)" % (self.host, len(message.items)))
-        if len(message.items) > 0:
-            self.local_peer.logger.info(
-                "%15s %s .. %s" % (self.host, human(message.items[0].hash), human(message.items[-1].hash)))
+            "%15s ConnectedRemotePeer.handle_inventory_message_received(len=%d from=%s to=%s)" % (
+                self.host, len(message.items),
+                human(message.items[0].hash) if len(message.items) > 0 else "None",
+                human(message.items[-1].hash) if len(message.items) > 0 else "None"))
+
+        self.last_inventory_response_at = int(time())  # TODO time() as a pass-along?
+
+        coinstate = self.local_peer.chain_manager.coinstate
+
+        if message.items == []:
+            self.local_peer.logger.info("%15s ConnectedRemotePeer.waiting_for_inventory=False" % self.host)
+            self.waiting_for_inventory = False
+            return
 
         if len(message.items) > GET_BLOCKS_INVENTORY_SIZE:
             raise Exception("Inventory msg too big")
@@ -399,15 +427,30 @@ class ConnectedRemotePeer(RemotePeer):
             self.waiting_for_inventory = False
             return
 
+        for msg_state in self.inventory_messages:
+            for item in msg_state.message.items:
+                if item.hash == message.items[-1].hash:
+                    self.local_peer.logger.info("%15s ... already have this inventory" % self.host)
+                    return
+
         self.inventory_messages.append(InventoryMessageState(header, message))
         self.check_inventory_messages()
 
         # speed optimization: go ahead and ask for more inventory now, there is no reason to wait
-        get_blocks_message = GetBlocksMessage([message.items[-1].hash])
+        get_blocks_message = GetBlocksMessage([msg.hash for msg in message.items[-1:-10:-1]])
+
+        if self.local_peer.logger.isEnabledFor(logging.INFO):
+            self.local_peer.logger.info(
+                "%15s requesting more blocks, start=[%s], stop=%s" % (
+                    self.host,
+                    [human(h) for h in get_blocks_message.potential_start_hashes],
+                    human(get_blocks_message.stop_hash)))
+
         self.send_message(get_blocks_message, prev_header=header)
 
     def check_inventory_messages(self) -> None:
         coinstate = self.local_peer.chain_manager.coinstate
+        requested = 0
 
         for msg_state in self.inventory_messages:
             if not msg_state.actually_used:
@@ -417,6 +460,10 @@ class ConnectedRemotePeer(RemotePeer):
                     if not item.block_requested and not coinstate.has_block_hash(item.hash):
                         item.block_requested = True
                         self.send_message(GetDataMessage(DATA_BLOCK, item.hash), prev_header=msg_state.header)
+                        requested += 1
+
+        self.local_peer.logger.info("%15s ConnectedRemotePeer.check_inventory_messages() requested=%d" %
+                                    (self.host, requested))
 
     def remove_from_inventory(self, hash: bytes) -> bool:
         for i, msg_state in enumerate(self.inventory_messages):
@@ -451,6 +498,7 @@ class ConnectedRemotePeer(RemotePeer):
         self.local_peer.logger.debug("%15s ConnectedRemotePeer.handle_data_message_received for hash %s h. %s" % (
             self.host, human(get_data_message.hash), coinstate.get_block_by_hash(get_data_message.hash).height))
         self.send_message(data_message, prev_header=header)
+        self.height_sent = block.height
 
     def handle_data_message_received(self, header: MessageHeader, message: DataMessage) -> None:
         self.local_peer.logger.info(
@@ -471,9 +519,14 @@ class ConnectedRemotePeer(RemotePeer):
 
         block: Block = message.data  # type: ignore
 
-        coinstate_prior = self.local_peer.chain_manager.coinstate
+        self.local_peer.logger.debug(
+            "%15s ConnectedRemotePeer.handle_block_received(type=%s format=%s height=%d)" % (
+             self.host, str(DATATYPES[message.data_type]), header.format(), block.height))
 
-        block_hash = block.hash()
+        if header.in_response_to != 0:
+            # delay new inventory requests for a peer that's still sending inventory blocks
+            self.last_inventory_response_at = int(time())
+
         flush = self.remove_from_inventory(block.hash())
 
         # this validation is not quite as effective if done later

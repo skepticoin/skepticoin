@@ -1,5 +1,6 @@
 
 import logging
+import os
 import random
 import selectors
 from skepticoin.networking.remote_peer import ConnectedRemotePeer, DisconnectedRemotePeer, IRRELEVANT
@@ -11,7 +12,7 @@ from datetime import datetime
 
 from typing import Optional
 from skepticoin.humans import human
-from skepticoin.networking.params import PORT
+from skepticoin.networking.params import PORT, SOCKET_RECEIVE_BUFFER_SIZE
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.networking.manager import ChainManager, NetworkManager
 from skepticoin.networking.disk_interface import DiskInterface
@@ -94,7 +95,7 @@ class LocalPeer:
 
         try:
             if mask & selectors.EVENT_READ:
-                recv_data = sock.recv(1024)
+                recv_data = sock.recv(SOCKET_RECEIVE_BUFFER_SIZE)
 
                 if recv_data:
                     remote_peer.handle_receive_data(recv_data)
@@ -105,9 +106,8 @@ class LocalPeer:
                 remote_peer.handle_can_send(sock)
 
         except OSError as e:  # e.g. ConnectionRefusedError, "Bad file descriptor"
-            # no print-to-screen for this one
-            self.logger.info("%15s Disconnecting remote peer %s" % (remote_peer.host, e))
-            self.disconnect(remote_peer, "OS error")
+            # logging is done in the disconnect() method
+            self.disconnect(remote_peer, e)
 
         except Exception as e:
             # We take the position that any exception caused is reason to disconnect. This allows the code that talks to
@@ -117,15 +117,14 @@ class LocalPeer:
             if "ValueError: Invalid file descriptor: " not in str(e):
                 self.logger.warning(traceback.format_exc())  # be loud... this is likely a programming error.
 
-            self.disconnect(remote_peer, "Exception")
+            self.disconnect(remote_peer, e)
 
-    def disconnect(self, remote_peer: ConnectedRemotePeer, reason: str = "") -> None:
-        self.logger.info("%15s LocalPeer.disconnect(%s)" % (remote_peer.host, reason))
+    def disconnect(self, remote_peer: ConnectedRemotePeer, error: Exception) -> None:
+        self.logger.info("%15s LocalPeer.disconnect(%s)" % (remote_peer.host, str(error)))
 
         try:
             self.selector.unregister(remote_peer.sock)
             remote_peer.sock.close()
-            self.network_manager.handle_peer_disconnected(remote_peer)
 
         except Exception:
             # yes yes... sweeping things under the carpet here. until I actually RTFM and think this through
@@ -184,6 +183,8 @@ class LocalPeer:
         except Exception:
             self.logger.error("Uncaught exception in LocalPeer.run()")
             self.logger.error(traceback.format_exc())
+            # this is not elegant but leaving unconnected miners running is worse
+            os._exit(-1)
         finally:
             self.logger.info("%15s LocalPeer selector close" % "")
             self.selector.close()
@@ -195,15 +196,32 @@ class LocalPeer:
 
     def show_stats(self) -> None:
         coinstate = self.chain_manager.coinstate
+        peers = self.network_manager.get_active_peers()
 
-        out = "NETWORK - %d connected peers: \n" % len(self.network_manager.get_active_peers())
-        for p in self.network_manager.get_active_peers():
+        out = "NETWORK - %d connected peers:\n" % (len(peers))
+
+        for p in peers:
             # TODO: Fix inconsistent usage of datatypes for PORT. int or str, pick one!
-            out += "  %15s:%s %s,\n" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction)  # type: ignore
+            port: str = p.port if p.port != IRRELEVANT else "...."  # type: ignore
+            details = " ".join(filter(lambda x: x != "", [
+                str(datetime.fromtimestamp(p.last_message_received_at)) if p.last_message_received_at else "-",
+                "inventory_wait=%d @ %s" % (
+                    len(p.inventory_messages),
+                    str(datetime.fromtimestamp(p.last_inventory_response_at)) if p.last_inventory_response_at else "-"
+                ) if p.inventory_messages else "",
+                "send_buffer=%d" % (
+                    len(p.send_buffer) + sum(len(x) for x in p.send_backlog)
+                ) if len(p.send_buffer)+len(p.send_backlog) else "",
+                "h.sent=%d" % p.height_sent,
+                "h.recv=%d" % p.height_received,
+            ]))
+            out += "  %15s:%5s %s %s\n" % (p.host, port, p.direction, details)
 
-        out += "CHAIN - "
-        for (head, lca) in coinstate.forks(depth=10):
+        heading = "CHAIN - "
+        for (head, lca) in coinstate.forks(10):
 
+            out += heading
+            heading = "        "
             out += "Height = %s, " % head.height
             out += "Date/time = %s\n" % datetime.fromtimestamp(head.timestamp).isoformat()
             if head.height != lca.height:
