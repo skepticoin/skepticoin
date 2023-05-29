@@ -1,8 +1,7 @@
 import datetime
 import os
-from skepticoin.blockstore import DefaultBlockStore
 from typing import Dict, List, Set, Tuple
-from skepticoin.datatypes import Block, Transaction
+from skepticoin.datatypes import Transaction
 from skepticoin.networking.remote_peer import (
     DisconnectedRemotePeer, RemotePeer, load_peers_from_list
 )
@@ -86,12 +85,6 @@ class DiskInterface:
             json.dump(keep[:PEERS_JSON_MAX_LEN], f, indent=4)
 
         os.replace(PEERS_JSON_FILE + ".new", PEERS_JSON_FILE)
-
-    def save_block(self, block: Block) -> None:
-        DefaultBlockStore.instance.add_block_to_buffer(block)
-
-    def flush_blocks(self) -> None:
-        DefaultBlockStore.instance.flush_blocks_to_disk()
 
     def save_transaction_for_debugging(self, transaction: Transaction) -> None:
         with open("/tmp/%s.transaction" % human(transaction.hash()), 'wb') as f:

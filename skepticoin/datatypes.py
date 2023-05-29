@@ -360,10 +360,6 @@ class Block(Serializable):
         self.header.stream_serialize(f)
         stream_serialize_list(f, self.transactions)
 
-    def get_total_work(self) -> int:
-        # TODO this is totally a placeholder :-D
-        return self.height  # type: ignore
-
 
 __all__ = [
     'OutputReference',

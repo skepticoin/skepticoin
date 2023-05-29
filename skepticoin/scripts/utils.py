@@ -1,4 +1,4 @@
-from skepticoin.blockstore import DefaultBlockStore
+from skepticoin.blockstore import BlockStore
 import sys
 from pathlib import Path
 from time import sleep, time
@@ -11,7 +11,8 @@ import argparse
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
-from skepticoin.humans import human
+
+DEFAULT_BLOCKSTORE_FILE_PATH = "blocks.db"
 
 
 class DefaultArgumentParser(argparse.ArgumentParser):
@@ -41,12 +42,7 @@ def wait_for_fresh_chain(thread: NetworkingThread, freshness: int) -> None:
 
 def read_chain_from_disk() -> CoinState:
 
-    coinstate = CoinState.empty()
-    for block in DefaultBlockStore.instance.read_blocks_from_disk():
-        try:
-            coinstate = coinstate.add_block_no_validation(block)
-        except Exception:
-            print(f'Skipping block_hash={human(block.hash())} @ height={block.height}')
+    coinstate = CoinState(BlockStore(DEFAULT_BLOCKSTORE_FILE_PATH))
 
     # It is no longer possible to load old files, due to pickle issues not worth solving.
 

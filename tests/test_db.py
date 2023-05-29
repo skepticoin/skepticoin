@@ -1,40 +1,55 @@
+from pathlib import Path
+from skepticoin.balances import get_balance
 from skepticoin.blockstore import BlockStore
 from skepticoin.coinstate import CoinState
+from skepticoin.datatypes import Block
 from skepticoin.humans import human
 import os
 
 from skepticoin.scripts.utils import open_or_init_wallet
 
+CHAIN_TESTDATA_PATH = Path(__file__).parent.joinpath("testdata/chain")
 
-def test_db():
-    coinstate = CoinState.zero()
 
-    if os.path.exists('test.db'):
-        os.remove('test.db')
+def read_test_chain_from_disk(max_height, suffix: str = "-default"):
+    coinstate = CoinState(setup_test_db(suffix))
 
-    db = BlockStore(path='test.db')
-    for block in coinstate.block_by_hash.values():
-        db.add_block_to_buffer(block)
+    for file_path in sorted(CHAIN_TESTDATA_PATH.iterdir()):
+        height = int(file_path.name.split("-")[0])
+        if height > max_height:
+            return coinstate
 
-    db.flush_blocks_to_disk()
+        block = Block.stream_deserialize(open(file_path, 'rb'))
+        coinstate = coinstate.add_block_batch([block])
 
-    cur = db.connection.cursor()
-    for row in cur.execute("select count(*) from chain"):
-        assert row[0] == 1
+    return coinstate
 
-    readstate = CoinState.zero()
-    for block in db.read_blocks_from_disk():
-        readstate.add_block_no_validation(block)
 
-    block1 = list(readstate.block_by_hash.values())[0]
-    block2 = list(coinstate.block_by_hash.values())[0]
+def test_chain_index():
+    coinstate = read_test_chain_from_disk(5)
+    assert coinstate.get_block_id_path(coinstate.current_chain_hash) == [1, 2, 3, 4, 5, 6]
 
-    assert block1.hash() == block2.hash()
-    assert block1.serialize() == block2.serialize()
-    assert block1.transactions == block2.transactions
+
+def setup_test_db(suffix: str = ""):
+    DATABASE_FILE_PATH = str(Path(__file__).parent.joinpath(f"testdata/test-{suffix}.db"))
+
+    if os.path.exists(DATABASE_FILE_PATH):
+        os.remove(DATABASE_FILE_PATH)
+
+    return BlockStore(path=DATABASE_FILE_PATH)
+
+
+def test_db_genesis():
+    blockstore = setup_test_db("genesis")
+    coinstate = CoinState(blockstore)
+
+    rows = blockstore.sql("select block_id from chain")
+    assert len(rows) == 1
+    assert rows[0][0] == 1
+
+    block1 = coinstate.block_by_height_at_head(0)
+
     assert human(block1.hash()) == '00c4ff1d0788c7058f3d8388d77b2feda0921fa141078fb895871634e0c36780'
 
     wallet = open_or_init_wallet()
-    assert wallet.get_balance(coinstate) == 0
-
-    db.close()
+    assert get_balance(wallet, coinstate) == 0

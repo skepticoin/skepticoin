@@ -8,6 +8,7 @@ from typing import Callable
 import immutables
 from collections import namedtuple
 from pathlib import Path
+from skepticoin.balances import uto_apply_transaction
 
 from skepticoin.coinstate import CoinState
 from skepticoin.signing import PublicKey
@@ -22,6 +23,15 @@ PKBalance2 = namedtuple('PKBalance2', [
     'unspent_output_references',
     'spent_in_transactions',
 ])
+
+
+def uto_apply_block(
+    unspent_transaction_outs: immutables.Map[OutputReference, Output], block: Block
+) -> immutables.Map[OutputReference, Output]:
+    unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, block.transactions[0], is_coinbase=True)
+    for transaction in block.transactions[1:]:
+        unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, transaction, is_coinbase=False)
+    return unspent_transaction_outs
 
 
 def show_coin(sashimi: int) -> str:
@@ -93,7 +103,14 @@ def get_unspent_transaction_outs_before_block(
 ) -> immutables.Map[OutputReference, Output]:
     if block.previous_block_hash == b"\00" * 32:
         return immutables.Map()
-    return coinstate.unspent_transaction_outs_by_hash[block.previous_block_hash]
+
+    unspent_transaction_outs: immutables.Map[OutputReference, Output] = immutables.Map()
+
+    for block_id in coinstate.get_block_id_path(block.previous_block_hash):
+        block = coinstate.blockstore.fetch_block(block_id)
+        unspent_transaction_outs = uto_apply_block(unspent_transaction_outs, block)
+
+    return unspent_transaction_outs
 
 
 def build_pkb2_block(
@@ -110,7 +127,7 @@ def build_pkb2(coinstate: CoinState) -> immutables.Map[PublicKey, PKBalance2]:
     public_key_balances_2: immutables.Map[PublicKey, PKBalance2] = immutables.Map()
 
     for height in range(coinstate.head().height + 1):
-        block = coinstate.at_head.block_by_height[height]
+        block = coinstate.block_by_height_at_head(height)
         public_key_balances_2 = build_pkb2_block(coinstate, block, public_key_balances_2)
 
     return public_key_balances_2
@@ -122,8 +139,8 @@ def build_explorer(coinstate: CoinState) -> None:
 
     for height in range(coinstate.head().height + 1):
         print("Block", height)
-        block = coinstate.at_head.block_by_height[height]
-        potential_message = block.transactions[0].inputs[0].signature.signature
+        block = coinstate.block_by_height_at_head(height)
+        potential_message = block.transactions[0].inputs[0].signature.signature  # type: ignore
 
         if all([(32 <= b < 127) or (b == 10) for b in potential_message]):
             msg = "```\n" + str(potential_message, encoding="ascii") + "\n```"

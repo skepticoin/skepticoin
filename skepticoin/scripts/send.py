@@ -76,7 +76,7 @@ def main() -> None:
             max_height = coinstate.head().height
 
             for i in range(10):
-                block = coinstate.by_height_at_head()[max(max_height - i, 0)]
+                block = coinstate.block_by_height_at_head(max(max_height - i, 0))
                 if transaction in block.transactions:
                     print("Transaction confirmed at", block.height, "with", i, "confirmation blocks")
 

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from skepticoin.networking.local_peer import DiskInterface
 import traceback
 from threading import Lock
 from typing import Dict, List, Optional, Set, Tuple
@@ -14,6 +13,8 @@ from skepticoin.consensus import (
     validate_non_coinbase_transaction_in_coinstate,
     ValidateTransactionError,
 )
+from skepticoin.networking.disk_interface import DiskInterface
+
 from .params import (
     MAX_IBD_PEERS,
     IBD_PEER_TIMEOUT,
@@ -259,7 +260,7 @@ class ChainManager(Manager):
     def get_get_blocks_message(self) -> GetBlocksMessage:
 
         heights = get_recent_block_heights(self.coinstate.head().height)
-        potential_start_hashes = [self.coinstate.by_height_at_head()[height].hash() for height in heights]
+        potential_start_hashes = self.coinstate.get_block_hashes_at_heights(heights)
         return GetBlocksMessage(potential_start_hashes)
 
 

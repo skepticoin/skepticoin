@@ -4,7 +4,6 @@ import random
 import selectors
 from skepticoin.networking.remote_peer import ConnectedRemotePeer, DisconnectedRemotePeer, IRRELEVANT
 from skepticoin.networking.remote_peer import INCOMING, LISTENING_SOCKET, OUTGOING
-from skepticoin.networking.disk_interface import DiskInterface
 import socket
 import traceback
 import sys
@@ -15,6 +14,7 @@ from skepticoin.humans import human
 from skepticoin.networking.params import PORT
 from skepticoin.params import DESIRED_BLOCK_TIMESPAN
 from skepticoin.networking.manager import ChainManager, NetworkManager
+from skepticoin.networking.disk_interface import DiskInterface
 from skepticoin.utils import calc_work
 from time import time
 from typing import Dict
@@ -202,9 +202,7 @@ class LocalPeer:
             out += "  %15s:%s %s,\n" % (p.host, p.port if p.port != IRRELEVANT else "....", p.direction)  # type: ignore
 
         out += "CHAIN - "
-        for (head, lca) in coinstate.forks():
-            if head.height < coinstate.head().height - 10:
-                continue  # don't show forks which are out-ran by more than 10 blocks
+        for (head, lca) in coinstate.forks(depth=10):
 
             out += "Height = %s, " % head.height
             out += "Date/time = %s\n" % datetime.fromtimestamp(head.timestamp).isoformat()
@@ -245,14 +243,14 @@ class LocalPeer:
         def get_block_timespan_factor(n: int) -> float:
             # Current block duration over past n block as a factor of DESIRED_BLOCK_TIMESPAN, e.g. 0.5 for twice desired
             # speed
-            diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
+            diff = coinstate.head().timestamp - coinstate.block_by_height_at_head(coinstate.head().height - n).timestamp
             return diff / (DESIRED_BLOCK_TIMESPAN * n)  # type: ignore
 
         def get_network_hash_rate(n: int) -> float:
             total_over_blocks = sum(
-                calc_work(coinstate.at_head.block_by_height[coinstate.head().height - i].target) for i in range(n))
+                calc_work(coinstate.block_by_height_at_head(coinstate.head().height - i).target) for i in range(n))
 
-            diff = coinstate.head().timestamp - coinstate.at_head.block_by_height[coinstate.head().height - n].timestamp
+            diff = coinstate.head().timestamp - coinstate.block_by_height_at_head(coinstate.head().height - n).timestamp
 
             return total_over_blocks / diff  # type: ignore
 

@@ -1,5 +1,6 @@
 from datetime import datetime
-from skepticoin.blockstore import DefaultBlockStore
+
+from skepticoin.balances import get_balance
 
 from .utils import (
     open_or_init_wallet,
@@ -32,10 +33,8 @@ def main() -> None:
     print("Chain up to date")
 
     print(
-        wallet.get_balance(coinstate) / SASHIMI_PER_COIN, "SKEPTI at h. %s," % coinstate.head().height,
+        get_balance(wallet, coinstate) / SASHIMI_PER_COIN, "SKEPTI at h. %s," % coinstate.head().height,
         datetime.fromtimestamp(coinstate.head().timestamp).isoformat())
-
-    DefaultBlockStore.instance.flush_blocks_to_disk()
 
     print("Waiting for networking thread to exit.")
     thread.stop()

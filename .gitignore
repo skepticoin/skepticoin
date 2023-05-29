@@ -16,6 +16,12 @@ sqlite-autoconf-*
 env*/
 test.db
 test.tmp
+blocks.db*
 chain.db*
 chain.zip
 .vscode/
+tests/testdata/test-*.db
+tests/testdata/test-*.db-shm
+tests/testdata/test-*.db-wal
+memray.out
+debug.txt

@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 import random
 import traceback
+from skepticoin.balances import get_balance
 from skepticoin.datatypes import Block, BlockHeader, BlockSummary, Transaction
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.coinstate import CoinState
@@ -109,7 +110,7 @@ class MinerWatcher:
         self.coinstate = read_chain_from_disk()
 
         self.wallet = open_or_init_wallet()
-        self.start_balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
+        self.start_balance = get_balance(self.wallet, self.coinstate) / Decimal(SASHIMI_PER_COIN)
         self.balance = self.start_balance
 
         self.network_thread = start_networking_peer_in_background(self.args, self.coinstate)
@@ -167,8 +168,7 @@ class MinerWatcher:
 
         n_peers = len(self.network_thread.local_peer.network_manager.get_active_peers())
         height = self.coinstate.head().height
-        forks = [True for (head, lca) in self.coinstate.forks()
-                 if head.height >= self.coinstate.head().height - 10 and head.height != lca.height]
+        forks = self.coinstate.fork_count(10)
 
         if self.args.quiet:
             stat = [height, n_peers, forks]
@@ -188,11 +188,11 @@ class MinerWatcher:
 
         mine_speed = (float(mined) / uptime.total_seconds()) * 60 * 60
 
-        print(f"{now_str} | uptime: {uptime_str} | {hashes:>3} hash/sec" +
-              f" | mined: {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h" +
+        print(f"{now_str}: up {uptime_str} | {hashes:>3} H" +
+              f" | mined {mined:>3} SKEPTI | {mine_speed:5.2f} SKEPTI/h" +
               f" | {n_peers:3d} peers | h. {height}" +
               f" @ {timestamp - self.coinstate.head().timestamp}s ago" +
-              (f" | {len(forks)} forks" if forks else ""))
+              (f" | {forks} forks" if forks != 1 else ""))
 
     def send_message(self, miner_id: int, message_type: str, data: Any) -> None:
         self.send_queues[miner_id].put((message_type, data))
@@ -254,18 +254,15 @@ class MinerWatcher:
             # we didn't mine the block
             return
 
-        self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
+        print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: miner {miner_id} found block: {block_filename(block)}')
         self.network_thread.local_peer.network_manager.broadcast_block(block)
 
-        self.coinstate = self.coinstate.add_block(block, int(time()))
-
-        self.network_thread.local_peer.disk_interface.save_block(block)
-        self.network_thread.local_peer.disk_interface.flush_blocks()
-
-        print(f"miner {miner_id} found block: {block_filename(block)}")
+        self.coinstate = self.coinstate.add_block_batch([block])
+        self.network_thread.local_peer.chain_manager.set_coinstate(self.coinstate)
+        self.network_thread.local_peer.show_stats()
 
         # get new public key for miner
         self.public_key = self.wallet.get_annotated_public_key("reserved for potentially mined block")
         save_wallet(self.wallet)
 
-        self.balance = self.wallet.get_balance(self.coinstate) / Decimal(SASHIMI_PER_COIN)
+        self.balance = get_balance(self.wallet, self.coinstate) / Decimal(SASHIMI_PER_COIN)

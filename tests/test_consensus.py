@@ -131,7 +131,7 @@ def test_construct_block_for_mining_with_non_coinbase_transactions():
 
     transactions = [Transaction(
         inputs=[Input(
-            OutputReference(coinstate.at_head.block_by_height[0].transactions[0].hash(), 0),
+            OutputReference(coinstate.block_by_height_at_head(0).transactions[0].hash(), 0),
             SECP256k1Signature(b'y' * 64),
         )],
         outputs=[Output(9 * SASHIMI_PER_COIN, example_public_key)],
@@ -247,10 +247,13 @@ def test_get_transaction_fee():
 
     previous_transaction_hash = b'a' * 32
 
-    unspent_transaction_outs = immutables.Map({
+    mock_data = immutables.Map({
         OutputReference(previous_transaction_hash, 0): Output(40, public_key),
         OutputReference(previous_transaction_hash, 1): Output(34, public_key),
     })
+
+    def unspent_transaction_outs(output_reference: OutputReference) -> Output:
+        return mock_data[output_reference]
 
     transaction = Transaction(
         inputs=[Input(
