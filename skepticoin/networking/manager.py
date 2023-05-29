@@ -195,13 +195,11 @@ class ChainManager(Manager):
             or (current_time % 60 == 0)  # on average, every 1 minutes, do a network resync explicitly
         )
 
-    def set_coinstate(self, coinstate: CoinState, validated: bool = True) -> None:
+    def set_coinstate(self, coinstate: CoinState) -> None:
         with self.lock:
             self.local_peer.logger.info("%15s ChainManager.set_coinstate(%s)" % ("", coinstate))
             self.coinstate = coinstate
             self._cleanup_transaction_pool_for_coinstate(coinstate)
-            if validated:
-                self.last_known_valid_coinstate = coinstate
 
     def add_transaction_to_pool(self, transaction: Transaction) -> bool:
         with self.lock:
