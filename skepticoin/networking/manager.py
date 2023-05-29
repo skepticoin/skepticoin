@@ -100,7 +100,6 @@ class NetworkManager(Manager):
                 remote_peer.ban_score += 1
                 self.local_peer.logger.info('%15s Disconnected without hello, ban_score=%d'
                                             % (remote_peer.host, remote_peer.ban_score))
-                self.disk_interface.write_peers(self.connected_peers)
 
             self.disconnected_peers[key] = remote_peer.as_disconnected()
 
