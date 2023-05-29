@@ -333,11 +333,12 @@ class ConnectedRemotePeer(RemotePeer):
                                                                     last_connection_attempt=None, ban_score=0)
             nm._sanity_check()
 
+        if self.direction == OUTGOING:
+            self.local_peer.disk_interface.write_peers(self)
+
         if self.direction == OUTGOING and message.nonce == self.local_peer.nonce:
             self.local_peer.network_manager.my_addresses.add((self.host, self.port))
             self.local_peer.disconnect(self, "connection to self")
-
-        self.local_peer.disk_interface.write_peers(self.local_peer.network_manager.connected_peers)
 
     def handle_get_blocks_message_received(self, header: MessageHeader, message: GetBlocksMessage) -> None:
         self.local_peer.logger.info("%15s ConnectedRemotePeer.handle_get_blocks_message_received()" % self.host)
