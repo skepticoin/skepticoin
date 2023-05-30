@@ -7,7 +7,7 @@ from typing import Dict, List, Mapping, Set, TextIO
 import ecdsa
 import json
 
-from .coinstate import CoinState, PKBalance
+from .coinstate import CoinState
 from .humans import computer, human
 from .signing import SECP256k1PublicKey, SECP256k1Signature
 from .datatypes import Input, Transaction, Output, OutputReference
@@ -90,13 +90,6 @@ class Wallet:
             public_key_annotations={computer(k): annotation for (k, annotation) in d["public_key_annotations"].items()},
         )
 
-    def get_balance(self, coinstate: CoinState) -> int:
-        return sum(
-            coinstate.public_key_balances_by_hash[coinstate.current_chain_hash].get(  # type: ignore
-                SECP256k1PublicKey(pk), PKBalance(0, [])).value
-            for pk in list(self.public_key_annotations.keys()) + self.unused_public_keys
-        )
-
 
 def sign_transaction(
     wallet: Wallet,
@@ -144,13 +137,21 @@ def create_spend_transaction(
     collected_value = 0
     inputs = []
 
-    unspent_transaction_outs = coinstate.at_head.unspent_transaction_outs
+    from skepticoin.balances import get_public_key_balances
+    public_key_balances = get_public_key_balances(wallet, coinstate)
+
+    unspent_transaction_outs = {
+        output_reference: Output(value=pkb.value, public_key=pk)
+        for pk, pkb in public_key_balances.items()
+        for output_reference in pkb.output_references
+    }
 
     for public_key in wallet.keypairs.keys():
-        if SECP256k1PublicKey(public_key) not in coinstate.at_head.public_key_balances:
+
+        if SECP256k1PublicKey(public_key) not in public_key_balances:
             continue
 
-        for output_reference in coinstate.at_head.public_key_balances[SECP256k1PublicKey(public_key)].output_references:
+        for output_reference in public_key_balances[SECP256k1PublicKey(public_key)].output_references:
             if output_reference in wallet.spent_transaction_outputs:
                 # in spent_transaction_outputs we keep track of those outputs that we've spent using this wallet (and
                 # presumably broadcast) but which haven't made it into the chain yet.

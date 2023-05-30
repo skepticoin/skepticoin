@@ -10,7 +10,6 @@ from skepticoin.consensus import (
 )
 
 from .utils import (
-    check_chain_dir,
     read_chain_from_disk,
     open_or_init_wallet,
     start_networking_peer_in_background,
@@ -34,7 +33,6 @@ def main() -> None:
         print("Invalid address")
         return
 
-    check_chain_dir()
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
     thread = start_networking_peer_in_background(args, coinstate)
@@ -76,7 +74,7 @@ def main() -> None:
             max_height = coinstate.head().height
 
             for i in range(10):
-                block = coinstate.by_height_at_head()[max(max_height - i, 0)]
+                block = coinstate.block_by_height_at_head(max(max_height - i, 0))
                 if transaction in block.transactions:
                     print("Transaction confirmed at", block.height, "with", i, "confirmation blocks")
 

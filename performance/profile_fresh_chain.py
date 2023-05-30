@@ -1,5 +1,6 @@
 "Profile the performance of downloading fresh chain from peers"
 
+from skepticoin.networking.disk_interface import DiskInterface
 from skepticoin.networking.threading import NetworkingThread
 
 from skepticoin.scripts.utils import (
@@ -21,16 +22,17 @@ def test_main():
     # And then we found that the performance of newer blocks is different!
     # coinstate = CoinState.zero()
     coinstate = read_chain_from_disk()
+    disk_interface = DiskInterface(1000)
 
     # we need to run in the current thread to profile it
-    nt = NetworkingThread(coinstate, port=None)
+    nt = NetworkingThread(coinstate, 2499, disk_interface, args)
 
     def runner():
         started = datetime.now()
         nt.local_peer.running = True
         start_height = nt.local_peer.chain_manager.coinstate.head().height
         print("start height = %d" % start_height)
-        while (datetime.now() - started).seconds <= 100:
+        while (datetime.now() - started).seconds <= 60:
             current_time = int(time())
             nt.local_peer.step_managers(current_time)
             nt.local_peer.handle_selector_events()

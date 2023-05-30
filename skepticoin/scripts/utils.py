@@ -1,4 +1,4 @@
-from skepticoin.blockstore import DefaultBlockStore
+from skepticoin.blockstore import BlockStore
 import sys
 from pathlib import Path
 from time import sleep, time
@@ -11,7 +11,8 @@ import argparse
 from skepticoin.coinstate import CoinState
 from skepticoin.networking.threading import NetworkingThread
 from skepticoin.wallet import Wallet, save_wallet
-from skepticoin.humans import human
+
+DEFAULT_BLOCKSTORE_FILE_PATH = "blocks.db"
 
 
 class DefaultArgumentParser(argparse.ArgumentParser):
@@ -21,11 +22,6 @@ class DefaultArgumentParser(argparse.ArgumentParser):
         self.add_argument("--listening-port", help="Port to listen on", type=int, default=2412)
         self.add_argument("--log-to-file", help="Log to file", action="store_true")
         self.add_argument("--log-to-stdout", help="Log to stdout", action="store_true")
-
-
-def check_chain_dir() -> None:
-    if os.path.exists('chain'):
-        print('Your ./chain/ directory is no longer needed: please delete it to stop this reminder.')
 
 
 def wait_for_fresh_chain(thread: NetworkingThread, freshness: int) -> None:
@@ -41,12 +37,7 @@ def wait_for_fresh_chain(thread: NetworkingThread, freshness: int) -> None:
 
 def read_chain_from_disk() -> CoinState:
 
-    coinstate = CoinState.empty()
-    for block in DefaultBlockStore.instance.read_blocks_from_disk():
-        try:
-            coinstate = coinstate.add_block_no_validation(block)
-        except Exception:
-            print(f'Skipping block_hash={human(block.hash())} @ height={block.height}')
+    coinstate = CoinState(BlockStore(DEFAULT_BLOCKSTORE_FILE_PATH))
 
     # It is no longer possible to load old files, due to pickle issues not worth solving.
 
@@ -63,10 +54,11 @@ def open_or_init_wallet() -> Wallet:
     if os.path.isfile("wallet.json"):
         wallet = Wallet.load(open("wallet.json", "r"))
     else:
+        print("Creating new wallet...")
         wallet = Wallet.empty()
         wallet.generate_keys(10_000)
         save_wallet(wallet)
-        print("Created new wallet w/ 10.000 keys")
+        print(f"Created new wallet w/ {len(wallet.keypairs)} keys")
 
     return wallet
 

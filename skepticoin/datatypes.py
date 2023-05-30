@@ -336,7 +336,7 @@ class Block(Serializable):
         raise AttributeError("'Block' object has no attribute '%s'" % attr)
 
     def __repr__(self) -> str:
-        return "Block #%s" % human(self.header.hash())
+        return "Block #%d-%s" % (self.height, human(self.hash()))
 
     def __eq__(self, other: Any) -> bool:
         return (
@@ -359,10 +359,6 @@ class Block(Serializable):
     def stream_serialize(self, f: BinaryIO) -> None:
         self.header.stream_serialize(f)
         stream_serialize_list(f, self.transactions)
-
-    def get_total_work(self) -> int:
-        # TODO this is totally a placeholder :-D
-        return self.height  # type: ignore
 
 
 __all__ = [

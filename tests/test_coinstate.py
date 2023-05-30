@@ -1,9 +1,43 @@
 import immutables
 
-from skepticoin.signing import CoinbaseData, SECP256k1PublicKey, SECP256k1Signature
+from skepticoin.signing import CoinbaseData, PublicKey, SECP256k1PublicKey, SECP256k1Signature
 from skepticoin.datatypes import Transaction, OutputReference, Input, Output
-from skepticoin.balances import uto_apply_transaction, pkb_apply_transaction, PKBalance
-from skepticoin.consensus import construct_reference_to_thin_air
+from skepticoin.balances import PKBalance, uto_apply_transaction
+from skepticoin.consensus import construct_reference_to_thin_air, validate_block_in_coinstate
+from tests.test_db import read_test_chain_from_disk
+
+
+def pkb_apply_transaction(
+    unspent_transaction_outs: immutables.Map[OutputReference, Output],
+    public_key_balances: immutables.Map[PublicKey, PKBalance],
+    transaction: Transaction,
+    is_coinbase: bool,
+) -> immutables.Map[PublicKey, PKBalance]:
+    with public_key_balances.mutate() as mutable_public_key_balances:
+        # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
+        if not is_coinbase:
+            for input in transaction.inputs:
+                previously_unspent_output = unspent_transaction_outs[input.output_reference]
+
+                public_key: PublicKey = previously_unspent_output.public_key
+                mutable_public_key_balances[public_key] = PKBalance(
+                    mutable_public_key_balances[public_key].value - previously_unspent_output.value,
+                    [to for to in mutable_public_key_balances[public_key].output_references
+                     if to != input.output_reference]
+                )
+
+        for i, output in enumerate(transaction.outputs):
+            output_reference = OutputReference(transaction.hash(), i)
+
+            if output.public_key not in mutable_public_key_balances:
+                mutable_public_key_balances[output.public_key] = PKBalance(0, [])
+
+            mutable_public_key_balances[output.public_key] = PKBalance(
+                mutable_public_key_balances[output.public_key].value + output.value,
+                mutable_public_key_balances[output.public_key].output_references + [output_reference],
+            )
+
+        return mutable_public_key_balances.finish()
 
 
 def test_uto_apply_transaction_on_coinbase():
@@ -134,3 +168,23 @@ def test_pkb_apply_transaction_on_non_coinbase_transaction():
 
     assert result[public_key_2].value == 30  # the value of the transaction output
     assert result[public_key_2].output_references == [OutputReference(transaction.hash(), 0)]
+
+
+def test_deferred_validation():
+    coinstate = read_test_chain_from_disk(5)
+    validation_coinstate = coinstate.checkout(coinstate.block_by_height_at_head(3).hash())
+    validate_block_in_coinstate(coinstate.block_by_height_at_head(4), validation_coinstate)
+
+
+def test_get_hashes_at_heights():
+    coinstate = read_test_chain_from_disk(5)
+
+    hashes = coinstate.get_block_hashes_at_heights([2, 5])
+    assert len(hashes) == 2
+    assert hashes[0] == coinstate.block_by_height_at_head(2).hash()
+    assert hashes[1] == coinstate.block_by_height_at_head(5).hash()
+
+    hashes = coinstate.get_block_hashes_at_heights([4, 1])
+    assert len(hashes) == 2
+    assert hashes[0] == coinstate.block_by_height_at_head(4).hash()
+    assert hashes[1] == coinstate.block_by_height_at_head(1).hash()

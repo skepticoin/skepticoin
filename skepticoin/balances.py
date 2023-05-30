@@ -1,12 +1,101 @@
-from collections import namedtuple
-from typing import Dict, Iterator, List, Optional
+
+from typing import List, Optional
+
 import immutables
+from skepticoin.blockstore import BlockStore
+from skepticoin.coinstate import CoinState
 
-from skepticoin.datatypes import Block, Output, OutputReference, Transaction
-from skepticoin.signing import PublicKey
+from skepticoin.datatypes import Output, OutputReference, Transaction
+from skepticoin.signing import PublicKey, SECP256k1PublicKey
+from skepticoin.wallet import Wallet
+import itertools
 
 
-PKBalance = namedtuple('PKBalance', ['value', 'output_references'])
+class PKBalance:
+
+    def __init__(self, value: int, output_references: List[OutputReference]):
+        self.value = value
+        self.output_references = output_references
+
+    def __repr__(self) -> str:
+        return "PKBalance(value=%s, output_references=%s)" % (self.value, self.output_references)
+
+
+def get_public_key_balances(wallet: Wallet, coinstate: CoinState) -> immutables.Map[PublicKey, PKBalance]:
+
+    public_keys = [SECP256k1PublicKey(pk).serialize() for pk in wallet.keypairs.keys()]
+    chain_index = set(coinstate.get_block_id_path(coinstate.current_chain_hash))
+
+    candidate_transaction_pairs = coinstate.blockstore.sql(f"""
+            SELECT txo.transaction_hash, txo.seq, txo.value, txo.public_key,
+                   output_block.block_id, input_block.block_id
+                FROM transaction_outputs txo
+                JOIN transaction_locator tlo ON(tlo.transaction_hash = txo.transaction_hash)
+                JOIN chain output_block ON(tlo.block_hash = output_block.block_hash)
+                LEFT OUTER JOIN transaction_inputs txi ON (
+                    txo.transaction_hash = txi.output_reference_hash AND
+                    txo.seq = txi.output_reference_index
+                )
+                LEFT OUTER JOIN transaction_locator tli ON(
+                    tli.transaction_hash = txi.transaction_hash)
+                LEFT OUTER JOIN chain input_block ON(
+                    tli.block_hash = input_block.block_hash)
+                WHERE txo.public_key IN ({", ".join(["?"] * len(public_keys))})
+        """, public_keys)  # type: ignore
+
+    utxo = [row for row in candidate_transaction_pairs
+            if row[4] in chain_index and row[5] not in chain_index]
+
+    group_by_public_key = {
+        k: list(v) for k, v in itertools.groupby(utxo, lambda row: row[3])  # type: ignore
+    }
+
+    return immutables.Map({
+        PublicKey.deserialize(public_key): PKBalance(
+            sum(row[2] for row in grouped_rows),
+            [OutputReference(row[0], row[1]) for row in grouped_rows]
+        ) for (public_key, grouped_rows) in group_by_public_key.items()
+    })
+
+
+def get_balance(wallet: Wallet, coinstate: CoinState) -> int:
+    return sum(balance.value for balance in get_public_key_balances(wallet, coinstate).values())
+
+
+def get_output_if_not_consumed(
+        blockstore: BlockStore, ref: OutputReference, chain_index: List[int]
+) -> Optional[Output]:
+
+    cross_chain_outs = blockstore.sql("""
+            SELECT value, public_key, chain.block_id
+            FROM transaction_outputs txo
+            JOIN transaction_locator USING (transaction_hash)
+            JOIN chain USING(block_hash)
+            WHERE transaction_hash = ? AND seq = ?
+    """, (ref.hash, ref.index))  # type: ignore
+
+    outs = [out for out in cross_chain_outs if out[2] in chain_index]
+
+    assert len(outs) == 1
+
+    (value, public_key) = outs[0][:2]
+
+    ins = blockstore.sql("""
+            SELECT chain.block_id
+            FROM transaction_inputs txi
+            JOIN transaction_locator USING(transaction_hash)
+            JOIN chain USING(block_hash)
+            WHERE output_reference_hash = ? AND output_reference_index = ?
+    """, (ref.hash, ref.index))  # type: ignore
+
+    ins = [i for i in ins if i[0] in chain_index]
+
+    if len(ins) > 0:
+        # normal: the output has been consumed
+        assert len(ins) == 1
+        return None
+
+    return Output(value, PublicKey.deserialize(public_key))
 
 
 def uto_apply_transaction(
@@ -28,105 +117,3 @@ def uto_apply_transaction(
             mutable_unspent_transaction_outs[output_reference] = output
 
         return mutable_unspent_transaction_outs.finish()
-
-
-def uto_apply_block(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output], block: Block
-) -> immutables.Map[OutputReference, Output]:
-    unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, block.transactions[0], is_coinbase=True)
-    for transaction in block.transactions[1:]:
-        unspent_transaction_outs = uto_apply_transaction(unspent_transaction_outs, transaction, is_coinbase=False)
-    return unspent_transaction_outs
-
-
-def pkb_apply_transaction(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output],
-    public_key_balances: immutables.Map[PublicKey, PKBalance],
-    transaction: Transaction,
-    is_coinbase: bool,
-) -> immutables.Map[PublicKey, PKBalance]:
-    with public_key_balances.mutate() as mutable_public_key_balances:
-        # for coinbase we must skip the input-removal because the input references "thin air" rather than an output.
-        if not is_coinbase:
-            for input in transaction.inputs:
-                previously_unspent_output = unspent_transaction_outs[input.output_reference]
-
-                public_key: PublicKey = previously_unspent_output.public_key
-                mutable_public_key_balances[public_key] = PKBalance(
-                    mutable_public_key_balances[public_key].value - previously_unspent_output.value,
-                    [to for to in mutable_public_key_balances[public_key].output_references
-                     if to != input.output_reference]
-                )
-
-        for i, output in enumerate(transaction.outputs):
-            output_reference = OutputReference(transaction.hash(), i)
-
-            if output.public_key not in mutable_public_key_balances:
-                mutable_public_key_balances[output.public_key] = PKBalance(0, [])
-
-            mutable_public_key_balances[output.public_key] = PKBalance(
-                mutable_public_key_balances[output.public_key].value + output.value,
-                mutable_public_key_balances[output.public_key].output_references + [output_reference],
-            )
-
-        return mutable_public_key_balances.finish()
-
-
-def pkb_apply_block(
-    unspent_transaction_outs: immutables.Map[OutputReference, Output],
-    public_key_balances: immutables.Map[PublicKey, PKBalance],
-    block: Block,
-) -> immutables.Map[PublicKey, PKBalance]:
-    # unspent_transaction_outs is used as a "reference" only (for looking up outputs); note that we never have to update
-    # that reference inside this function, because intra-block spending is invalid per the consensus.
-
-    public_key_balances = pkb_apply_transaction(
-        unspent_transaction_outs, public_key_balances, block.transactions[0], is_coinbase=True)
-
-    for transaction in block.transactions[1:]:
-        public_key_balances = pkb_apply_transaction(unspent_transaction_outs, public_key_balances, transaction, False)
-
-    return public_key_balances
-
-
-class PublicKeyBalances():
-
-    def __init__(
-        self,
-        block_by_hash: immutables.Map[bytes, Block],
-    ) -> None:
-
-        self.block_by_hash = block_by_hash
-        self.cache: Dict[bytes, immutables.Map[PublicKey, PKBalance]] = {}
-
-    def chain_at_hash(self, hash: bytes) -> Iterator[Block]:
-        block = self.block_by_hash[hash]
-        reverse_chain: List[Block] = [block]
-        while block.previous_block_hash != b'\x00' * 32:
-            previous_hash = block.previous_block_hash
-            block = self.block_by_hash[previous_hash]
-            reverse_chain.append(block)
-        return reversed(reverse_chain)
-
-    def public_key_balances_by_hash(self, head: Optional[bytes]) -> immutables.Map[PublicKey, PKBalance]:
-
-        if head is None:
-            return immutables.Map()
-
-        public_key_balances: immutables.Map[PublicKey, PKBalance] = immutables.Map()
-        unspent_transaction_outs: immutables.Map[OutputReference, Output] = immutables.Map()
-
-        for block in self.chain_at_hash(head):
-
-            public_key_balances = pkb_apply_block(unspent_transaction_outs,
-                                                  public_key_balances,
-                                                  block)
-
-            unspent_transaction_outs = uto_apply_block(unspent_transaction_outs, block)
-
-        return public_key_balances
-
-    def __getitem__(self, key: bytes) -> immutables.Map[PublicKey, PKBalance]:
-        if key not in self.cache:
-            self.cache[key] = self.public_key_balances_by_hash(key)
-        return self.cache[key]

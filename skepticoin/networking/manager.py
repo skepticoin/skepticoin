@@ -1,11 +1,10 @@
 from __future__ import annotations
-from skepticoin.networking.local_peer import DiskInterface
+from datetime import datetime
 import traceback
 from threading import Lock
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 from skepticoin.coinstate import CoinState
-import random
 
 from skepticoin.humans import human
 from skepticoin.consensus import (
@@ -14,11 +13,12 @@ from skepticoin.consensus import (
     validate_non_coinbase_transaction_in_coinstate,
     ValidateTransactionError,
 )
+from skepticoin.networking.disk_interface import DiskInterface
+
 from .params import (
-    MAX_IBD_PEERS,
-    IBD_PEER_TIMEOUT,
+    IBD_REQUEST_LIFETIME,
+    IBD_PEER_ACTIVITY_TIMEOUT,
     SWITCH_TO_ACTIVE_MODE_TIMEOUT,
-    EMPTY_INVENTORY_BACKOFF,
 )
 from skepticoin.datatypes import Block, Transaction
 from skepticoin.networking.remote_peer import ConnectedRemotePeer, DisconnectedRemotePeer, OUTGOING
@@ -78,7 +78,7 @@ class NetworkManager(Manager):
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
         if key in self.connected_peers:
             self.local_peer.logger.warning("%15s duplicate peer %s" % (remote_peer.host, key))
-            self.local_peer.disconnect(self.connected_peers[key], "duplicate")  # just drop the existing one
+            self.local_peer.disconnect(self.connected_peers[key], ValueError("duplicate"))  # just drop the existing one
 
         self._sanity_check()
         self.connected_peers[key] = remote_peer
@@ -87,7 +87,7 @@ class NetworkManager(Manager):
         self._sanity_check()
 
     def handle_peer_disconnected(self, remote_peer: ConnectedRemotePeer) -> None:
-        self.local_peer.logger.info("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
+        self.local_peer.logger.debug("%15s NetworkManager.handle_peer_disconnected()" % remote_peer.host)
 
         key = (remote_peer.host, remote_peer.port, remote_peer.direction)
 
@@ -106,7 +106,8 @@ class NetworkManager(Manager):
         self._sanity_check()
 
     def get_active_peers(self) -> List[ConnectedRemotePeer]:
-        return [p for p in self.connected_peers.values() if p.hello_sent and p.hello_received]
+        return [p for p in self.connected_peers.values()
+                if p.hello_sent and p.hello_received and not p.connection_to_self]
 
     def broadcast_block(self, block: Block) -> None:
         self.local_peer.logger.info("%15s ChainManager.broadcast_block(%s)" % ("", human(block.hash())))
@@ -145,46 +146,55 @@ class ChainManager(Manager):
         self.local_peer = local_peer
         self.lock = Lock()
         self.coinstate: CoinState
-        self.actively_fetching_blocks_from_peers: List[
-            Tuple[int, ConnectedRemotePeer]
-        ] = []
         self.started_at = current_time
         self.transaction_pool: List[Transaction] = []
-        self.last_known_valid_coinstate: Optional[CoinState] = None
 
     def step(self, current_time: int) -> None:
+
         if not self.should_actively_fetch_blocks(current_time):
             return  # no manual action required, blocks expected to be sent to us instead.
 
-        ibd_candidates = [
-            peer for peer in self.local_peer.network_manager.get_active_peers()
-            if current_time > peer.last_empty_inventory_response_at + EMPTY_INVENTORY_BACKOFF
-        ]
+        for peer in self.local_peer.network_manager.get_active_peers():
+            if peer.waiting_for_inventory:
+                assert peer.last_inventory_request_at != 0
+                if current_time > peer.last_inventory_request_at + IBD_REQUEST_LIFETIME:
+                    self.local_peer.disconnect(peer, ValueError(
+                        "too long since IBD request sent @ %s" %
+                        str(datetime.fromtimestamp(peer.last_inventory_request_at))))
+                elif (peer.last_inventory_response_at != 0
+                        and current_time >
+                        peer.last_inventory_response_at + IBD_PEER_ACTIVITY_TIMEOUT):
+                    self.local_peer.disconnect(peer, ValueError(
+                        "too long since last IBD response received @ %s" %
+                        str(datetime.fromtimestamp(peer.last_inventory_response_at))))
 
-        if len(ibd_candidates) == 0:
+        # sort by last request time so we eventually loop over all peers
+        peer_rotation_schedule = sorted(self.local_peer.network_manager.get_active_peers(),
+                                        key=lambda p: p.last_inventory_request_at)
+
+        if len(peer_rotation_schedule) == 0:
             return
 
-        # TODO note that if a peer disconnects, it is never removed from actively_fetching_blocks_from_peers, which
-        # means that your IBD will be stuck until it times out. Not the best but it will recover eventually at least.
-        self.actively_fetching_blocks_from_peers = [
-            (timeout_at, p)
-            for (timeout_at, p) in self.actively_fetching_blocks_from_peers
-            if current_time < timeout_at and
-            not inventory_batch_handled(p)]
+        for peer in peer_rotation_schedule:
+            if (current_time <
+                    IBD_PEER_ACTIVITY_TIMEOUT +
+                    max(peer.last_inventory_request_at,
+                        peer.last_inventory_response_at)):
+                return
 
-        if len(self.actively_fetching_blocks_from_peers) > MAX_IBD_PEERS:
-            return
+        # pick the peer we haven't sent requests to in the longest time, and ask for blocks
+        remote_peer = peer_rotation_schedule[0]
 
-        get_blocks_message = self.get_get_blocks_message()
+        get_blocks_message, height = self.get_get_blocks_message()
 
-        # TODO once MAX_IBD_PEERS > 1... pick one that you haven't picked before? potentially :-D
-        remote_peer = random.choice(ibd_candidates)
         remote_peer.waiting_for_inventory = True
-        self.actively_fetching_blocks_from_peers.append((current_time + IBD_PEER_TIMEOUT, remote_peer))
-        remote_peer.send_message(get_blocks_message)
+        remote_peer.last_inventory_request_at = current_time
+        remote_peer.last_inventory_response_at = 0
 
-        # timeout is only implemented half-baked: it currently only limits when an new GetBlocksMessage will be sent;
-        # but doesn't take the timed-out peer out of the loop that it's already in. This is not necessarily a bad thing.
+        self.local_peer.logger.info("%15s Requesting blocks at h. > %d" % (
+            remote_peer.host, height))
+
+        remote_peer.send_message(get_blocks_message)
 
     def should_actively_fetch_blocks(self, current_time: int) -> bool:
 
@@ -194,13 +204,11 @@ class ChainManager(Manager):
             or (current_time % 60 == 0)  # on average, every 1 minutes, do a network resync explicitly
         )
 
-    def set_coinstate(self, coinstate: CoinState, validated: bool = True) -> None:
+    def set_coinstate(self, coinstate: CoinState) -> None:
         with self.lock:
             self.local_peer.logger.info("%15s ChainManager.set_coinstate(%s)" % ("", coinstate))
             self.coinstate = coinstate
             self._cleanup_transaction_pool_for_coinstate(coinstate)
-            if validated:
-                self.last_known_valid_coinstate = coinstate
 
     def add_transaction_to_pool(self, transaction: Transaction) -> bool:
         with self.lock:
@@ -256,14 +264,16 @@ class ChainManager(Manager):
 
         self.transaction_pool = [t for t in self.transaction_pool if is_valid(t)]
 
-    def get_get_blocks_message(self) -> GetBlocksMessage:
+    def get_get_blocks_message(self) -> Tuple[GetBlocksMessage, int]:
 
-        heights = get_recent_block_heights(self.coinstate.head().height)
-        potential_start_hashes = [self.coinstate.by_height_at_head()[height].hash() for height in heights]
-        return GetBlocksMessage(potential_start_hashes)
+        coinstate = self.coinstate
+        height = coinstate.head().height
 
+        oldness = list([pow(2, x) for x in range(0, 22)])
+        old_heights = [x for x in [height - o for o in oldness] if x >= 0]
 
-def get_recent_block_heights(block_height: int) -> List[int]:
-    oldness = list(range(10)) + [pow(x, 2) for x in range(4, 64)]
-    heights = [x for x in [block_height - o for o in oldness] if x >= 0]
-    return heights
+        potential_start_hashes = [
+            coinstate.current_chain_hash
+        ] + coinstate.get_block_hashes_at_heights(old_heights)
+
+        return GetBlocksMessage(potential_start_hashes), height

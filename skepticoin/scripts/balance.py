@@ -1,9 +1,11 @@
 from datetime import datetime
-from skepticoin.blockstore import DefaultBlockStore
+from time import sleep
+
+from skepticoin.validator import Validator
+from skepticoin.balances import get_balance
 
 from .utils import (
     open_or_init_wallet,
-    check_chain_dir,
     read_chain_from_disk,
     configure_logging_from_args,
     start_networking_peer_in_background,
@@ -19,7 +21,6 @@ def main() -> None:
     args = parser.parse_args()
     configure_logging_from_args(args)
 
-    check_chain_dir()
     coinstate = read_chain_from_disk()
     wallet = open_or_init_wallet()
 
@@ -29,13 +30,21 @@ def main() -> None:
 
     wait_for_fresh_chain(thread, freshness=300)
     coinstate = thread.local_peer.chain_manager.coinstate
+
     print("Chain up to date")
 
     print(
-        wallet.get_balance(coinstate) / SASHIMI_PER_COIN, "SKEPTI at h. %s," % coinstate.head().height,
+        get_balance(wallet, coinstate) / SASHIMI_PER_COIN, "SKEPTI at h. %s," % coinstate.head().height,
         datetime.fromtimestamp(coinstate.head().timestamp).isoformat())
 
-    DefaultBlockStore.instance.flush_blocks_to_disk()
+    validator = Validator()
+    while coinstate.blockstore.validation_queue_size() > 0:
+        print(
+            "Chain validation is %s blocks behind. Balance could change if validation fails." %
+            coinstate.blockstore.validation_queue_size())
+
+        validator.step(thread.local_peer.chain_manager)
+        sleep(1)
 
     print("Waiting for networking thread to exit.")
     thread.stop()
